@@ -2046,11 +2046,57 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Create Presentation ────────────────────────────────────────────────────
 
   const createPptxBtn = document.getElementById("createPptxBtn");
+
+  const PPTX_BTN_HTML =
+    `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="2" width="10" height="13" rx="1.5" fill="#fff" stroke="#c2540a" stroke-width="1.2"/><rect x="5" y="0" width="10" height="13" rx="1.5" fill="#fff7f0" stroke="#c2540a" stroke-width="1.2"/><rect x="7" y="4" width="6" height="1.5" rx=".75" fill="#c2540a"/><rect x="7" y="7" width="5" height="1.5" rx=".75" fill="#c2540a"/><rect x="7" y="10" width="4" height="1.5" rx=".75" fill="#c2540a"/></svg> Create Presentation`;
+
   createPptxBtn.addEventListener("click", () => {
     createPresentation();
   });
 
   function createPresentation() {
+    // Disable button immediately so user knows something is happening
+    createPptxBtn.disabled = true;
+    createPptxBtn.textContent = "Generating…";
+
+    // Wrap everything in try/catch — any sync error before write() would otherwise
+    // silently swallow the failure and leave the button permanently disabled.
+    let pres;
+    try {
+      pres = buildPresentation();
+    } catch (err) {
+      console.error("PPTX build failed:", err);
+      alert("Failed to build presentation: " + err.message);
+      createPptxBtn.disabled = false;
+      createPptxBtn.innerHTML = PPTX_BTN_HTML;
+      return;
+    }
+
+    const safeName = (sharedFileName || "presentation").replace(/\.xlsx$/i, "");
+    const fileName = `${safeName}_presentation.pptx`;
+
+    pres.write({ outputType: "blob" })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement("a");
+        a.href     = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      })
+      .catch(err => {
+        console.error("PPTX write failed:", err);
+        alert("Failed to generate presentation: " + err.message);
+      })
+      .finally(() => {
+        createPptxBtn.disabled = false;
+        createPptxBtn.innerHTML = PPTX_BTN_HTML;
+      });
+  }
+
+  function buildPresentation() {
     const rows  = filteredRows();
     const kpis  = computeKpis(rows);
 
@@ -2652,12 +2698,8 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // ── Save ─────────────────────────────────────────────────────────────────
-    const safeName = (sharedFileName || "presentation").replace(/\.xlsx$/i, "");
-    pres.writeFile({ fileName: `${safeName}_presentation.pptx` }).catch(err => {
-      console.error("PPTX generation failed:", err);
-      alert("Failed to generate presentation: " + err.message);
-    });
+    // Return the assembled presentation object for the caller to save
+    return pres;
   }
 
 });
