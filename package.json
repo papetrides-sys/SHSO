@@ -1,0 +1,14 @@
+{
+  "name": "excel-filter-app-web",
+  "version": "1.0.0",
+  "description": "Browser-based Excel filter tool — port of filter_ids.py",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@jest/globals": "^29.7.0",
+    "jest-environment-node": "^29.7.0"
+  }
+}

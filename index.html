@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHSO ICD Tickets Analysis</title>
+
+  <!-- SheetJS — xlsx parsing, pinned version -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- PptxGenJS — client-side PPTX generation -->
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #1f2328;
+      background: #f7f8fa;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem 4rem;
+    }
+
+    /* ── Shared header ─────────────────────────────────────────────────────── */
+    .app-header {
+      width: 100%;
+      max-width: 700px;
+      margin-bottom: 2rem;
+    }
+    .app-header h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #1f2328;
+    }
+    .app-header .tagline {
+      font-size: 0.875rem;
+      color: #57606a;
+    }
+
+    /* ── Back button ───────────────────────────────────────────────────────── */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      color: #3b82d4;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      margin-bottom: 1.25rem;
+      text-decoration: none;
+    }
+    .back-btn:hover { text-decoration: underline; }
+
+    /* ── Card ──────────────────────────────────────────────────────────────── */
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 700px;
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .card .subtitle {
+      color: #57606a;
+      font-size: 0.875rem;
+      margin-bottom: 1.75rem;
+    }
+
+    /* ── Home tiles ────────────────────────────────────────────────────────── */
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+    .tile {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .tile:hover {
+      border-color: #3b82d4;
+      box-shadow: 0 2px 8px rgba(59,130,212,0.12);
+    }
+    .tile .tile-icon {
+      margin-bottom: 0.85rem;
+      line-height: 1;
+    }
+    .tile .tile-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1f2328;
+    }
+    .tile .tile-desc {
+      font-size: 0.8rem;
+      color: #57606a;
+      margin-top: 0.3rem;
+    }
+
+    /* ── Drop zone ─────────────────────────────────────────────────────────── */
+    #dropZone {
+      border: 2px dashed #d0d7de;
+      border-radius: 6px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 1.25rem;
+    }
+    #dropZone:hover, #dropZone.drag-over {
+      border-color: #3b82d4;
+      background: #f0f6ff;
+    }
+    #dropZone p { color: #57606a; font-size: 0.9rem; }
+    #dropZone strong { color: #3b82d4; }
+    #fileName { font-size: 0.8rem; color: #57606a; margin-top: 0.4rem; }
+    #fileInput { display: none; }
+
+    /* ── Home drop zone ────────────────────────────────────────────────────── */
+    #homeDropZone {
+      border: 2.5px dashed #b0bec5;
+      border-radius: 10px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 0;
+      background: #f7f8fa;
+      user-select: none;
+    }
+    #homeDropZone:hover, #homeDropZone.drag-over {
+      border-color: #3b82d4;
+      background: #eef4ff;
+    }
+    #homeDropZone.drag-over {
+      border-style: solid;
+    }
+    #homeDropZone .drop-icon {
+      font-size: 2.75rem;
+      line-height: 1;
+      margin-bottom: 0.75rem;
+    }
+    #homeDropZone .drop-primary {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1f2328;
+      margin-bottom: 0.35rem;
+    }
+    #homeDropZone .drop-primary strong {
+      color: #3b82d4;
+    }
+    #homeDropZone .drop-secondary {
+      font-size: 0.82rem;
+      color: #57606a;
+      margin-bottom: 0;
+    }
+    #homeDropZone .drop-filename {
+      display: inline-block;
+      margin-top: 0.85rem;
+      font-size: 0.82rem;
+      color: #3b82d4;
+      font-weight: 500;
+    }
+    #homeFileInput { display: none; }
+
+    /* ── Option row ────────────────────────────────────────────────────────── */
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+      color: #444d56;
+    }
+    .option-row input[type="checkbox"] { width: 1rem; height: 1rem; cursor: pointer; }
+
+    /* ── Criteria box ──────────────────────────────────────────────────────── */
+    .criteria-box {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 0.9rem 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .criteria-box h3 {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+      margin-bottom: 0.6rem;
+    }
+    .criteria-box table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .criteria-box th, .criteria-box td { text-align: left; padding: 0.25rem 0.4rem; }
+    .criteria-box th { color: #57606a; font-weight: 600; }
+    .criteria-box td code {
+      background: #e8ecf0;
+      border-radius: 3px;
+      padding: 0.05em 0.35em;
+      font-size: 0.82em;
+    }
+
+    /* ── Error box ─────────────────────────────────────────────────────────── */
+    .error-box {
+      background: #fff0f0;
+      border: 1px solid #f5c2c7;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      color: #b91c1c;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Update tickets results ────────────────────────────────────────────── */
+    #resultsSection { margin-top: 0.5rem; }
+    #resultCount { font-weight: 600; margin-bottom: 0.75rem; color: #1f2328; }
+    #resultsList { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; }
+    #resultsList li {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 5px;
+      padding: 0.45rem 0.85rem;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 0.9rem;
+      color: #1f2328;
+    }
+
+    /* ── Statistics ────────────────────────────────────────────────────────── */
+    #statsDropZone {
+      border: 2px dashed #d0d7de;
+      border-radius: 6px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 1.25rem;
+    }
+    #statsDropZone:hover, #statsDropZone.drag-over {
+      border-color: #7c5cd8;
+      background: #f5f0ff;
+    }
+    #statsDropZone p { color: #57606a; font-size: 0.9rem; }
+    #statsDropZone strong { color: #7c5cd8; }
+    #statsFileName { font-size: 0.8rem; color: #57606a; margin-top: 0.4rem; }
+    #statsFileInput { display: none; }
+
+    .stats-option-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+      color: #444d56;
+    }
+    .stats-option-row input[type="checkbox"] { width: 1rem; height: 1rem; cursor: pointer; }
+
+    /* ── Stats filter panel ────────────────────────────────────────────────── */
+    #statsFilters {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .filter-group {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+    }
+    .filter-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.6rem;
+    }
+    .filter-group-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+    }
+    .filter-toggle-all {
+      font-size: 0.75rem;
+      color: #3b82d4;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      line-height: 1;
+    }
+    .filter-toggle-all:hover { text-decoration: underline; }
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      border: 1.5px solid #d0d7de;
+      background: #ffffff;
+      font-size: 0.8rem;
+      color: #444d56;
+      cursor: pointer;
+      user-select: none;
+      line-height: 1.4;
+    }
+    .filter-chip input[type="checkbox"] { display: none; }
+    .filter-chip.selected {
+      border-color: #7c5cd8;
+      background: #f5f0ff;
+      color: #5b21b6;
+      font-weight: 500;
+    }
+
+    #chartsArea { display: flex; flex-direction: column; gap: 2rem; margin-top: 0.5rem; }
+    .pie-row { display: flex; flex-wrap: wrap; gap: 2rem; }
+    .pie-row > .chart-block { flex: 1; min-width: 260px; }
+
+    .chart-block h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+      margin-bottom: 0.75rem;
+    }
+
+    /* Bar chart rows */
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.45rem;
+      font-size: 0.85rem;
+    }
+    .bar-label { width: 140px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1f2328; }
+    .bar-track { flex: 1; background: #f0f0f0; border-radius: 4px; height: 18px; position: relative; }
+    .bar-fill  { height: 100%; border-radius: 4px; min-width: 2px; }
+    .bar-count { width: 36px; text-align: right; flex-shrink: 0; color: #57606a; }
+
+    /* Pie SVG */
+    .pie-wrap { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+    .pie-legend { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.83rem; }
+    .legend-item {
+      display: flex; align-items: center; gap: 0.4rem;
+      cursor: pointer; border-radius: 4px; padding: 0.15rem 0.35rem;
+    }
+    .legend-item:hover { background: #f0f0f0; }
+    .legend-item.active { background: #f5f0ff; }
+    .legend-swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+    .pie-slice { cursor: pointer; opacity: 1; transition: opacity 0.1s; }
+    .pie-slice:hover { opacity: 0.8; }
+    .pie-slice.active { opacity: 0.75; stroke: #1f2328; stroke-width: 2; }
+
+    /* Drill-down list */
+    .drilldown {
+      margin-top: 1rem;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 0.85rem;
+    }
+    .drilldown-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #57606a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.6rem;
+    }
+    .drilldown-sev-filter {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+    .drilldown-sev-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #57606a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-right: 0.2rem;
+    }
+    .drilldown-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .drilldown-table th {
+      text-align: left;
+      padding: 0.3rem 0.6rem;
+      font-weight: 600;
+      color: #57606a;
+      background: #f7f8fa;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .drilldown-table td {
+      padding: 0.3rem 0.6rem;
+      border-bottom: 1px solid #f0f0f0;
+      color: #1f2328;
+      word-break: break-word;
+    }
+    .drilldown-table tr:last-child td { border-bottom: none; }
+    .drilldown-table td:first-child {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 0.82rem;
+    }
+
+    /* ── Col-16 section ────────────────────────────────────────────────────── */
+    .col16-section {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 1.5rem;
+      margin-top: 0.5rem;
+    }
+    .col16-section h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+      margin-bottom: 0.85rem;
+    }
+    /* Stacked bar chart */
+    .stacked-bar-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 0.7rem;
+      font-size: 0.85rem;
+    }
+    .stacked-bar-label {
+      width: 72px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #1f2328;
+      font-weight: 500;
+    }
+    .stacked-bar-track {
+      flex: 1;
+      display: flex;
+      height: 20px;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #f0f0f0;
+    }
+    .stacked-seg {
+      height: 100%;
+      cursor: pointer;
+      transition: opacity 0.1s;
+      min-width: 2px;
+    }
+    .stacked-seg:hover { opacity: 0.75; }
+    .stacked-seg.active { outline: 2px solid #1f2328; outline-offset: -1px; }
+    .stacked-bar-total {
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+      color: #57606a;
+      font-size: 0.82rem;
+    }
+    .stacked-bar-inline-legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem 0.75rem;
+      font-size: 0.78rem;
+      color: #444d56;
+      width: 100%;
+      padding-left: calc(72px + 0.6rem); /* align under bar, past label */
+      margin-top: 0.25rem;
+    }
+    .stacked-bar-inline-item {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .stacked-bar-inline-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .stacked-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+      margin-bottom: 1rem;
+      font-size: 0.82rem;
+    }
+    .stacked-legend-item { display: flex; align-items: center; gap: 0.35rem; }
+    .stacked-legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── Burnout section ───────────────────────────────────────────────────── */
+    .aging-section {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 1.5rem;
+      margin-top: 0.5rem;
+    }
+    .aging-section h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+      margin-bottom: 0.85rem;
+    }
+    .aging-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .aging-controls label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.875rem;
+      color: #444d56;
+    }
+    .aging-controls input[type="date"] {
+      font-size: 0.875rem;
+      border: 1px solid #d0d7de;
+      border-radius: 5px;
+      padding: 0.3rem 0.55rem;
+      color: #1f2328;
+      background: #fff;
+    }
+    .aging-fetch-btn {
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 0.35rem 1rem;
+      border-radius: 5px;
+      border: none;
+      background: #3b82d4;
+      color: #fff;
+      cursor: pointer;
+    }
+    .aging-fetch-btn:hover { background: #2563b0; }
+    .aging-hint { font-size: 0.78rem; color: #57606a; margin-bottom: 1rem; }
+    .aging-error { font-size: 0.85rem; color: #b91c1c; margin-bottom: 0.75rem; }
+
+    /* Creation chart section */
+    .creation-section {
+      margin-top: 1.75rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    /* Stat bar above the creation chart */
+    .creation-stat-bar {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.85rem;
+    }
+    .creation-stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .creation-stat-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1f2328;
+      line-height: 1.2;
+    }
+    .creation-stat-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+      margin-top: 0.1rem;
+    }
+    .creation-trend {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+    }
+    .creation-trend.up   { color: #b91c1c; background: #fff0f0; }
+    .creation-trend.down { color: #15803d; background: #f0fdf4; }
+    .creation-trend.flat { color: #57606a; background: #f7f8fa; }
+    /* SVG bar chart */
+    .creation-bar { transition: opacity 0.1s; }
+    .creation-bar:hover { opacity: 0.75; cursor: pointer; }
+
+    /* Line chart */
+    .aging-chart-wrap { overflow-x: auto; }
+    .aging-svg { display: block; width: 100%; height: auto; }
+    .aging-grid-line { stroke: #e5e7eb; stroke-width: 1; }
+    .aging-axis-line { stroke: #d0d7de; stroke-width: 1; }
+    .aging-axis-label { font-size: 10px; fill: #57606a; }
+    .aging-series-todo    { fill: none; stroke: #3b82d4; stroke-width: 2; }
+    .aging-series-inprog  { fill: none; stroke: #f59e0b; stroke-width: 2; }
+    .aging-series-testing { fill: none; stroke: #7c5cd8; stroke-width: 2; }
+    .aging-series-done    { fill: none; stroke: #22c55e; stroke-width: 2; }
+    .aging-dot-todo    { fill: #3b82d4; }
+    .aging-dot-inprog  { fill: #f59e0b; }
+    .aging-dot-testing { fill: #7c5cd8; }
+    .aging-dot-done    { fill: #22c55e; }
+    .aging-legend { display: flex; gap: 1.25rem; margin-top: 0.6rem; font-size: 0.82rem; flex-wrap: wrap; }
+    .aging-legend-item { display: flex; align-items: center; gap: 0.35rem; }
+    .aging-legend-swatch { width: 22px; height: 3px; border-radius: 2px; }
+
+    /* Hover tooltip */
+    .aging-tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: #1f2328;
+      color: #fff;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      padding: 0.4rem 0.65rem;
+      border-radius: 5px;
+      white-space: nowrap;
+      display: none;
+    }
+    .aging-chart-wrap { overflow-x: auto; position: relative; }
+
+    /* Footer */
+    footer {
+      margin-top: 3rem;
+      font-size: 0.75rem;
+      color: #57606a;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 1rem;
+      width: 100%;
+      max-width: 700px;
+      text-align: center;
+    }
+
+    /* View visibility */
+    .view { display: none; width: 100%; max-width: 700px; }
+    .view.active { display: block; }
+
+    /* ── Statistics dashboard ──────────────────────────────────────────────── */
+    #viewStats {
+      max-width: none;
+      margin-left: -1rem;
+      margin-right: -1rem;
+      width: calc(100% + 2rem);
+    }
+
+    /* Top bar: title + filename */
+    .dash-topbar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+      background: #ffffff;
+    }
+    .dash-topbar h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1f2328;
+      margin: 0;
+    }
+    .dash-topbar .dash-file-label {
+      font-size: 0.82rem;
+      color: #57606a;
+    }
+    .dash-topbar .dash-back-btn {
+      margin-left: auto;
+      font-size: 0.82rem;
+      color: #3b82d4;
+      border: none;
+      background: none;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: none;
+    }
+    .dash-topbar .dash-back-btn:hover { text-decoration: underline; }
+    .pptx-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 0.32rem 0.9rem;
+      border-radius: 5px;
+      border: 1.5px solid #d0773a;
+      background: #fff7f0;
+      color: #c2540a;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .pptx-btn:hover { background: #fff0e0; border-color: #c2540a; }
+    .pptx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Body = sidebar + main */
+    .dash-body {
+      display: flex;
+      align-items: flex-start;
+      min-height: calc(100vh - 120px);
+    }
+
+    /* Left sidebar */
+    .dash-sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      border-right: 1px solid #e5e7eb;
+      background: #ffffff;
+      padding: 1rem;
+      position: sticky;
+      top: 0;
+      max-height: 100vh;
+      overflow-y: auto;
+    }
+    .dash-sidebar-heading {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #57606a;
+      margin-bottom: 0.75rem;
+    }
+    /* Sidebar collapse toggle — always visible in the topbar */
+    .dash-sidebar-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #57606a;
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 5px;
+      padding: 0.3rem 0.7rem;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .dash-sidebar-toggle:hover { border-color: #3b82d4; color: #3b82d4; }
+    /* Collapsed: hide the entire sidebar */
+    .dash-sidebar.collapsed {
+      display: none;
+    }
+
+    /* Main content area */
+    .dash-main {
+      flex: 1;
+      min-width: 0;
+      padding: 1.25rem 1.5rem 2.5rem;
+      background: #f7f8fa;
+    }
+
+    /* ── KPI strip ─────────────────────────────────────────────────────────── */
+    .dash-kpi-row {
+      margin-bottom: 1.25rem;
+    }
+    .kpi-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .kpi-tile {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 0.85rem 1.25rem 0.8rem;
+      min-width: 130px;
+      flex: 1 1 130px;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.12s;
+    }
+    .kpi-tile:hover  { border-color: #3b82d4; }
+    .kpi-tile.active { border-color: #3b82d4; background: #f0f6ff; }
+    .kpi-tile.kpi-accent-green  { border-top: 3px solid #22c55e; }
+    .kpi-tile.kpi-accent-blue   { border-top: 3px solid #3b82d4; }
+    .kpi-tile.kpi-accent-amber  { border-top: 3px solid #f59e0b; }
+    .kpi-tile.kpi-accent-purple { border-top: 3px solid #7c5cd8; }
+    .kpi-tile.kpi-accent-red    { border-top: 3px solid #ef4444; }
+    .kpi-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #1f2328;
+      line-height: 1.15;
+    }
+    .kpi-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+      margin-top: 0.2rem;
+    }
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: #57606a;
+      margin-top: 0.15rem;
+    }
+    /* KPI drilldown panel sits below the strip */
+    .kpi-drilldown {
+      margin-top: 0.85rem;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+
+    /* Responsive chart grid — strict 2-column layout */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .dash-grid .chart-block,
+    .dash-grid .col16-section {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      min-width: 0; /* prevent overflow in grid cells */
+    }
+    .dash-grid .col16-section { border-top: 1px solid #e5e7eb; }
+    @media (max-width: 700px) {
+      .dash-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Full-width panel (burnout) */
+    .dash-full {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+    }
+    .dash-full .aging-section {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    /* Panel section headings */
+    .dash-panel-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #57606a;
+      margin-bottom: 0.85rem;
+    }
+
+    /* Error box inside sidebar */
+    .dash-sidebar .error-box { margin-bottom: 0.75rem; }
+
+    /* Narrow screen: sidebar stacks above content */
+    @media (max-width: 700px) {
+      .dash-body { flex-direction: column; }
+      .dash-sidebar {
+        width: 100%;
+        position: static;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      /* collapsed on mobile: hide sidebar entirely (toggle still in topbar) */
+      .dash-sidebar.collapsed { display: none; }
+      .dash-main { padding: 1rem; }
+      .dash-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Shared page header ──────────────────────────────────────────────── -->
+  <header class="app-header">
+    <h1>SHSO ICD Tickets Analysis</h1>
+    <p class="tagline" id="homeTagline">Upload a file to get started</p>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       VIEW: Home
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="viewHome" class="view active">
+
+    <!-- File upload card -->
+    <div class="card" style="margin-bottom:1.25rem">
+      <div id="homeDropZone" role="button" tabindex="0" aria-label="Click or drag and drop an xlsx file here">
+        <div class="drop-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <rect x="8" y="4" width="26" height="34" rx="3" fill="#e8f0fe" stroke="#3b82d4" stroke-width="1.5"/>
+            <rect x="14" y="12" width="14" height="2" rx="1" fill="#3b82d4" opacity=".5"/>
+            <rect x="14" y="17" width="10" height="2" rx="1" fill="#3b82d4" opacity=".5"/>
+            <rect x="14" y="22" width="12" height="2" rx="1" fill="#3b82d4" opacity=".5"/>
+            <circle cx="35" cy="35" r="9" fill="#3b82d4"/>
+            <line x1="35" y1="30" x2="35" y2="40" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            <line x1="30" y1="35" x2="40" y2="35" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="drop-primary"><strong>Click to browse</strong> or drag &amp; drop here</p>
+        <p class="drop-secondary">Supports <strong>.xlsx</strong> files only</p>
+        <span id="homeFileName" class="drop-filename"></span>
+      </div>
+      <input type="file" id="homeFileInput" accept=".xlsx" aria-hidden="true" />
+      <label class="option-row" style="margin-top:0.9rem;margin-bottom:0">
+        <input type="checkbox" id="homeHeaderCheckbox" checked />
+        First row is a header row (skip it)
+      </label>
+      <p id="homeErrorBox" class="error-box" style="margin-top:0.75rem;margin-bottom:0" hidden></p>
+    </div>
+
+    <!-- Tool tiles — disabled until file is loaded -->
+    <div class="tile-grid" id="tileGrid" style="opacity:0.4;pointer-events:none">
+
+      <!-- Statistics tile -->
+      <div class="tile" id="tileStats" role="button" tabindex="0" aria-label="Open Statistics">
+        <div class="tile-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M32 32 L32 4 A28 28 0 0 1 57.9 46.0 Z" fill="#3b82d4"/>
+            <path d="M32 32 L57.9 46.0 A28 28 0 0 1 32 60 Z" fill="#7c5cd8"/>
+            <path d="M32 32 L32 60 A28 28 0 0 1 6.1 46.0 Z" fill="#22c55e"/>
+            <path d="M32 32 L6.1 46.0 A28 28 0 0 1 32 4 Z" fill="#f59e0b"/>
+            <circle cx="32" cy="32" r="11" fill="#ffffff"/>
+          </svg>
+        </div>
+        <div class="tile-title">Statistics</div>
+        <div class="tile-desc">Charts &amp; breakdowns from your Excel file</div>
+      </div>
+
+      <!-- Update Tickets tile -->
+      <div class="tile" id="tileUpdate" role="button" tabindex="0" aria-label="Open Update Tickets">
+        <div class="tile-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="8" y="8" width="48" height="48" rx="6" fill="#e8ecf0"/>
+            <rect x="16" y="16" width="20" height="4" rx="2" fill="#3b82d4"/>
+            <rect x="16" y="24" width="32" height="3" rx="1.5" fill="#c0c8d0"/>
+            <rect x="16" y="31" width="28" height="3" rx="1.5" fill="#c0c8d0"/>
+            <rect x="16" y="38" width="24" height="3" rx="1.5" fill="#c0c8d0"/>
+            <circle cx="48" cy="46" r="10" fill="#22c55e"/>
+            <polyline points="43,46 47,50 53,42" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="tile-title">Update Tickets</div>
+        <div class="tile-desc">Extract filtered IDs from an Excel file</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       VIEW: Statistics (dashboard layout)
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="viewStats" class="view">
+
+    <!-- Top bar -->
+    <div class="dash-topbar">
+      <button class="dash-sidebar-toggle" id="dashSidebarToggle" aria-expanded="true" aria-controls="dashSidebar">&#9660; Filters</button>
+      <h2>Statistics</h2>
+      <span class="dash-file-label" id="statsFileLabel"></span>
+      <button class="pptx-btn" id="createPptxBtn" title="Export current view as PowerPoint">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="2" width="10" height="13" rx="1.5" fill="#fff" stroke="#c2540a" stroke-width="1.2"/><rect x="5" y="0" width="10" height="13" rx="1.5" fill="#fff7f0" stroke="#c2540a" stroke-width="1.2"/><rect x="7" y="4" width="6" height="1.5" rx=".75" fill="#c2540a"/><rect x="7" y="7" width="5" height="1.5" rx=".75" fill="#c2540a"/><rect x="7" y="10" width="4" height="1.5" rx=".75" fill="#c2540a"/></svg>
+        Create Presentation
+      </button>
+      <button class="dash-back-btn" id="backFromStats">&#8592; Back to home</button>
+    </div>
+
+    <div class="dash-body">
+
+      <!-- Sidebar: filters + error -->
+      <aside class="dash-sidebar" id="dashSidebar">
+        <div id="statsErrorBox" class="error-box" role="alert" hidden></div>
+        <!-- Chip filter groups injected here by buildFilters() -->
+        <div id="statsFilters" hidden></div>
+      </aside>
+
+      <!-- Main content -->
+      <main class="dash-main">
+
+        <!-- KPI row (total tickets count) — summaryCard() is appended here -->
+        <div class="dash-kpi-row" id="dashKpiRow" hidden></div>
+
+        <!-- Grid: pies + type bar + verticals stacked bar -->
+        <div class="dash-grid" id="dashGrid" hidden>
+
+          <!-- Pie charts and bar chart are injected here by renderCharts() -->
+
+          <!-- Bugs per Vertical panel -->
+          <div id="col16Section" class="col16-section" hidden>
+            <p class="dash-panel-title">Bugs per Vertical</p>
+            <div id="col16Filters" style="margin-bottom:1rem"></div>
+            <div id="col16ChartArea"></div>
+            <div id="col16Drilldown" class="drilldown" hidden>
+              <p id="col16DrillTitle" class="drilldown-title"></p>
+              <table id="col16DrillTable" class="drilldown-table"></table>
+            </div>
+          </div>
+
+          <!-- Enhancements per Vertical panel -->
+          <div id="col16EnhSection" class="col16-section" hidden>
+            <p class="dash-panel-title">Enhancements per Vertical</p>
+            <div id="col16EnhFilters" style="margin-bottom:1rem"></div>
+            <div id="col16EnhChartArea"></div>
+            <div id="col16EnhDrilldown" class="drilldown" hidden>
+              <p id="col16EnhDrillTitle" class="drilldown-title"></p>
+              <table id="col16EnhDrillTable" class="drilldown-table"></table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Full-width burnout panel -->
+        <div class="dash-full" id="dashFull" hidden>
+          <div id="agingSection" class="aging-section" hidden>
+            <p class="dash-panel-title">Burnout</p>
+            <p class="aging-hint">
+              Tracks <strong>TODO</strong>, <strong>INPROG</strong>, <strong>TESTING</strong> and <strong>DONE/CLOSED</strong>
+              tickets (Column 4 date) grouped by calendar week. Active filters are applied.
+            </p>
+            <div class="aging-controls">
+              <label>From <input type="date" id="agingFrom" /></label>
+              <label>To &nbsp;&nbsp;<input type="date" id="agingTo" /></label>
+              <button class="aging-fetch-btn" id="agingFetch">Fetch</button>
+            </div>
+            <p id="agingError" class="aging-error" hidden></p>
+            <div id="agingChartWrap" class="aging-chart-wrap" hidden></div>
+          </div>
+
+          <!-- Bugs Created per Week — populated by runAging() -->
+          <div id="bugsCreationSection"  class="creation-section" hidden></div>
+          <!-- Enhancements Created per Week — populated by runAging() -->
+          <div id="enhCreationSection"   class="creation-section" hidden></div>
+          <!-- Operational Created per Week — populated by runAging() -->
+          <div id="opCreationSection"    class="creation-section" hidden></div>
+        </div>
+
+        <!-- chartsArea kept for JS compat; content is redistributed via JS -->
+        <div id="chartsArea" hidden></div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       VIEW: Update Tickets
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="viewUpdate" class="view">
+    <button class="back-btn" id="backFromUpdate">&#8592; Back to home</button>
+    <div class="card">
+      <h2>Update Tickets</h2>
+      <p id="updateFileLabel" style="color:#57606a;font-size:0.875rem;margin-bottom:1.5rem"></p>
+
+      <div class="criteria-box">
+        <h3>Filter criteria applied</h3>
+        <table>
+          <thead><tr><th>Column</th><th>Position</th><th>Required value</th></tr></thead>
+          <tbody>
+            <tr><td>ID</td><td>1</td><td><em>returned</em></td></tr>
+            <tr><td>Status</td><td>3</td><td><code>DONE</code> or <code>CLOSED</code></td></tr>
+            <tr><td>Status date</td><td>4</td><td>≥ selected date</td></tr>
+            <tr><td>Group</td><td>5</td><td><code>HIS_GROUP</code></td></tr>
+            <tr><td>Type</td><td>6</td><td><code>Defect (Bug)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Date + Type filter + Fetch -->
+      <div id="updateDateControls" hidden>
+        <div class="aging-controls" style="margin-bottom:0.6rem">
+          <label>Status date from <input type="date" id="updateFromDate" /></label>
+        </div>
+        <div class="aging-controls">
+          <label style="align-items:center">
+            Type
+            <select id="updateTypeSelect" style="margin-left:0.4rem;font-size:0.875rem;border:1px solid #d0d7de;border-radius:5px;padding:0.3rem 0.55rem;color:#1f2328;background:#fff"></select>
+          </label>
+          <button class="aging-fetch-btn" id="updateFetch">Fetch</button>
+        </div>
+      </div>
+
+      <div id="errorBox" class="error-box" role="alert" hidden></div>
+
+      <section id="resultsSection" hidden>
+        <p id="resultCount"></p>
+        <ul id="resultsList"></ul>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="src/app.js"></script>
+
+  <footer>Made with IBM Bob</footer>
+
+</body>
+</html>
