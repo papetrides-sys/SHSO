@@ -2251,10 +2251,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /** Draw a simple horizontal bar chart */
-    function drawBars(slide, entries, x, y, w, h, barColor, title) {
+    function drawBars(slide, entries, x, y, w, bh, barColor, title) {
       if (title) addSectionLabel(slide, title, x, y, w);
       const top    = y + (title ? 0.22 : 0);
-      const bH     = Math.min(0.22, (h - 0.22) / Math.max(entries.length, 1));
+      const bH     = Math.min(0.22, (bh - 0.22) / Math.max(entries.length, 1));
       const maxVal = Math.max(...entries.map(([, c]) => c), 1);
       const labelW = 1.1;
       const countW = 0.3;
