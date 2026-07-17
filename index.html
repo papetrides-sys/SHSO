@@ -131,8 +131,8 @@
     #fileName { font-size: 0.8rem; color: #57606a; margin-top: 0.4rem; }
     #fileInput { display: none; }
 
-    /* ── Home drop zone ────────────────────────────────────────────────────── */
-    #homeDropZone {
+    /* ── Drop zone (shared) ────────────────────────────────────────────────── */
+    .app-drop-zone {
       border: 2.5px dashed #b0bec5;
       border-radius: 10px;
       padding: 3rem 2rem;
@@ -143,40 +143,23 @@
       background: #f7f8fa;
       user-select: none;
     }
-    #homeDropZone:hover, #homeDropZone.drag-over {
+    .app-drop-zone:hover, .app-drop-zone.drag-over {
       border-color: #3b82d4;
       background: #eef4ff;
     }
-    #homeDropZone.drag-over {
-      border-style: solid;
+    .app-drop-zone.drag-over { border-style: solid; }
+    .app-drop-zone .drop-icon { font-size: 2.75rem; line-height: 1; margin-bottom: 0.75rem; }
+    .app-drop-zone .drop-primary {
+      font-size: 1rem; font-weight: 600; color: #1f2328; margin-bottom: 0.35rem;
     }
-    #homeDropZone .drop-icon {
-      font-size: 2.75rem;
-      line-height: 1;
-      margin-bottom: 0.75rem;
+    .app-drop-zone .drop-primary strong { color: #3b82d4; }
+    .app-drop-zone .drop-secondary { font-size: 0.82rem; color: #57606a; margin-bottom: 0; }
+    .app-drop-zone .drop-filename {
+      display: inline-block; margin-top: 0.85rem;
+      font-size: 0.82rem; color: #3b82d4; font-weight: 500;
     }
-    #homeDropZone .drop-primary {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #1f2328;
-      margin-bottom: 0.35rem;
-    }
-    #homeDropZone .drop-primary strong {
-      color: #3b82d4;
-    }
-    #homeDropZone .drop-secondary {
-      font-size: 0.82rem;
-      color: #57606a;
-      margin-bottom: 0;
-    }
-    #homeDropZone .drop-filename {
-      display: inline-block;
-      margin-top: 0.85rem;
-      font-size: 0.82rem;
-      color: #3b82d4;
-      font-weight: 500;
-    }
-    #homeFileInput { display: none; }
+    #homeFileInput  { display: none; }
+    #bcFileInput    { display: none; }
 
     /* ── Option row ────────────────────────────────────────────────────────── */
     .option-row {
@@ -227,18 +210,73 @@
     }
 
     /* ── Update tickets results ────────────────────────────────────────────── */
-    #resultsSection { margin-top: 0.5rem; }
-    #resultCount { font-weight: 600; margin-bottom: 0.75rem; color: #1f2328; }
-    #resultsList { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; }
-    #resultsList li {
-      background: #f7f8fa;
-      border: 1px solid #e5e7eb;
-      border-radius: 5px;
-      padding: 0.45rem 0.85rem;
-      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-      font-size: 0.9rem;
-      color: #1f2328;
+    .update-result-section {
+      margin-top: 1.25rem;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 1rem;
     }
+    .update-section-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+      padding-left: 0.6rem;
+      border-left: 3px solid currentColor;
+    }
+    .update-section-title--green { color: #15803d; }
+    .update-section-title--amber { color: #b45309; }
+    .update-section-title--blue  { color: #1d4ed8; }
+    .update-section-hint {
+      font-size: 0.78rem;
+      color: #57606a;
+      margin-bottom: 0.65rem;
+    }
+    .update-section-count {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #1f2328;
+      margin-bottom: 0.5rem;
+    }
+    .update-result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+      margin-top: 0.25rem;
+    }
+    .update-result-table thead tr {
+      background: #f7f8fa;
+    }
+    .update-result-table th {
+      text-align: left;
+      padding: 0.35rem 0.65rem;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #57606a;
+      border-bottom: 2px solid #e5e7eb;
+      white-space: nowrap;
+    }
+    .update-result-table td {
+      padding: 0.35rem 0.65rem;
+      border-bottom: 1px solid #f0f0f0;
+      color: #1f2328;
+      vertical-align: top;
+    }
+    .update-result-table tr:last-child td { border-bottom: none; }
+    .update-result-table td:first-child {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    .update-result-table td.update-td-summary {
+      max-width: 280px;
+      word-break: break-word;
+    }
+    .update-result-table td.update-td-date  { white-space: nowrap; }
+    .update-result-table td.update-td-sev   { white-space: nowrap; }
+    .update-result-table td.update-td-fix   { white-space: nowrap; }
+    /* Reopen table sits inside a dash-full panel — inherit full width */
+    .reopen-table { margin-top: 0; }
 
     /* ── Statistics ────────────────────────────────────────────────────────── */
     #statsDropZone {
@@ -891,6 +929,140 @@
       .dash-main { padding: 1rem; }
       .dash-grid { grid-template-columns: 1fr; }
     }
+
+    /* ── Baseline Comparison view ──────────────────────────────────────────── */
+    #viewBaseline { max-width: none; margin-left: -1rem; margin-right: -1rem; width: calc(100% + 2rem); }
+    .bc-body { display: flex; align-items: flex-start; min-height: calc(100vh - 120px); }
+    .bc-sidebar {
+      width: 260px; flex-shrink: 0;
+      border-right: 1px solid #e5e7eb;
+      background: #ffffff;
+      padding: 1rem;
+      position: sticky; top: 0;
+      max-height: 100vh; overflow-y: auto;
+    }
+    .bc-main {
+      flex: 1; min-width: 0;
+      padding: 1.25rem 1.5rem 2.5rem;
+      background: #f7f8fa;
+    }
+    .bc-kpi-section {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1.1rem 1.25rem 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .bc-section-label {
+      font-size: 0.78rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 0.85rem;
+      padding-left: 0.55rem;
+      border-left: 3px solid currentColor;
+    }
+    .bc-section-label--blue   { color: #1d4ed8; }
+    .bc-section-label--amber  { color: #b45309; }
+    .bc-section-label--green  { color: #15803d; }
+    .bc-section-label--purple { color: #6d28d9; }
+    /* Delivered-for-Testing table */
+    .bc-dft-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+      margin-top: 0.25rem;
+    }
+    .bc-dft-table thead tr { background: #f7f8fa; }
+    .bc-dft-table th {
+      text-align: left;
+      padding: 0.35rem 0.65rem;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #57606a;
+      border-bottom: 2px solid #e5e7eb;
+      white-space: nowrap;
+    }
+    .bc-dft-table td {
+      padding: 0.35rem 0.65rem;
+      border-bottom: 1px solid #f0f0f0;
+      color: #1f2328;
+      vertical-align: top;
+    }
+    .bc-dft-table tr:last-child td { border-bottom: none; }
+    .bc-dft-table td:first-child {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    .bc-dft-td-desc    { max-width: 280px; word-break: break-word; }
+    .bc-dft-td-status  { white-space: nowrap; }
+    .bc-dft-td-sev     { white-space: nowrap; }
+    .bc-dft-td-fix     { white-space: nowrap; }
+    .bc-dft-empty {
+      font-size: 0.85rem;
+      color: #57606a;
+      padding: 0.5rem 0;
+    }
+    /* Progress grid */
+    .bc-progress-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+    .bc-progress-card {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 0.85rem 1rem 0.8rem;
+    }
+    .bc-progress-kpi-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #57606a;
+      margin-bottom: 0.55rem;
+    }
+    .bc-progress-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      margin-bottom: 0.3rem;
+      font-size: 0.82rem;
+      color: #57606a;
+    }
+    .bc-progress-row span:first-child { width: 5.5rem; flex-shrink: 0; }
+    .bc-progress-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2328;
+    }
+    .bc-delta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.18rem 0.5rem;
+      border-radius: 20px;
+      margin-top: 0.5rem;
+    }
+    .bc-delta--better  { background: #f0fdf4; color: #15803d; }
+    .bc-delta--worse   { background: #fff0f0; color: #b91c1c; }
+    .bc-delta--neutral { background: #f7f8fa; color: #57606a; }
+    .bc-file-tag {
+      font-size: 0.72rem; font-weight: 400;
+      text-transform: none; letter-spacing: 0;
+      color: #57606a; margin-left: 0.5rem;
+    }
+    .bc-sidebar.collapsed { display: none; }
+    @media (max-width: 700px) {
+      .bc-body { flex-direction: column; }
+      .bc-sidebar { width: 100%; position: static; max-height: none; border-right: none; border-bottom: 1px solid #e5e7eb; }
+      .bc-sidebar.collapsed { display: none; }
+      .bc-main { padding: 1rem; }
+    }
   </style>
 </head>
 <body>
@@ -908,7 +1080,7 @@
 
     <!-- File upload card -->
     <div class="card" style="margin-bottom:1.25rem">
-      <div id="homeDropZone" role="button" tabindex="0" aria-label="Click or drag and drop an xlsx file here">
+      <div id="homeDropZone" class="app-drop-zone" role="button" tabindex="0" aria-label="Click or drag and drop an xlsx file here">
         <div class="drop-icon">
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
             <rect x="8" y="4" width="26" height="34" rx="3" fill="#e8f0fe" stroke="#3b82d4" stroke-width="1.5"/>
@@ -967,6 +1139,154 @@
         <div class="tile-desc">Extract filtered IDs from an Excel file</div>
       </div>
 
+      <!-- Baseline Comparison tile -->
+      <div class="tile" id="tileBaseline" role="button" tabindex="0" aria-label="Open Baseline Comparison">
+        <div class="tile-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="6"  y="10" width="22" height="44" rx="4" fill="#e8f0fe" stroke="#3b82d4" stroke-width="1.5"/>
+            <rect x="36" y="10" width="22" height="44" rx="4" fill="#fef3e2" stroke="#f59e0b" stroke-width="1.5"/>
+            <rect x="11" y="18" width="12" height="2.5" rx="1.2" fill="#3b82d4" opacity=".6"/>
+            <rect x="11" y="24" width="9"  height="2.5" rx="1.2" fill="#3b82d4" opacity=".6"/>
+            <rect x="11" y="30" width="11" height="2.5" rx="1.2" fill="#3b82d4" opacity=".6"/>
+            <rect x="41" y="18" width="12" height="2.5" rx="1.2" fill="#f59e0b" opacity=".7"/>
+            <rect x="41" y="24" width="8"  height="2.5" rx="1.2" fill="#f59e0b" opacity=".7"/>
+            <rect x="41" y="30" width="10" height="2.5" rx="1.2" fill="#f59e0b" opacity=".7"/>
+            <line x1="32" y1="20" x2="32" y2="44" stroke="#c0c8d0" stroke-width="1.5" stroke-dasharray="3 2"/>
+            <polygon points="27,32 37,32 32,26" fill="#22c55e" opacity=".8"/>
+            <polygon points="27,36 37,36 32,42" fill="#ef4444" opacity=".7"/>
+          </svg>
+        </div>
+        <div class="tile-title">Baseline Comparison</div>
+        <div class="tile-desc">Compare current data against a baseline file</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════════════
+       VIEW: Baseline Comparison
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="viewBaseline" class="view">
+
+    <!-- Top bar -->
+    <div class="dash-topbar">
+      <button class="dash-sidebar-toggle" id="bcSidebarToggle" aria-expanded="true" aria-controls="bcSidebar">&#9660; Filters</button>
+      <h2>Baseline Comparison</h2>
+      <span class="dash-file-label" id="bcCurrentFileLabel"></span>
+      <button class="dash-back-btn" id="backFromBaseline">&#8592; Back to home</button>
+    </div>
+
+    <div class="bc-body">
+
+      <!-- Sidebar -->
+      <aside class="bc-sidebar" id="bcSidebar">
+
+        <!-- Baseline file upload -->
+        <p class="dash-sidebar-heading">Baseline File</p>
+        <div id="bcDropZone" class="app-drop-zone" style="padding:1.25rem 1rem" role="button" tabindex="0" aria-label="Click or drag and drop a baseline xlsx file here">
+          <div class="drop-icon" style="font-size:1.75rem;margin-bottom:0.4rem">
+            <svg width="32" height="32" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <rect x="6" y="4" width="22" height="28" rx="3" fill="#fef3e2" stroke="#f59e0b" stroke-width="1.5"/>
+              <rect x="10" y="11" width="14" height="2" rx="1" fill="#f59e0b" opacity=".5"/>
+              <rect x="10" y="16" width="10" height="2" rx="1" fill="#f59e0b" opacity=".5"/>
+              <rect x="10" y="21" width="12" height="2" rx="1" fill="#f59e0b" opacity=".5"/>
+              <circle cx="35" cy="35" r="9" fill="#f59e0b"/>
+              <line x1="35" y1="30" x2="35" y2="40" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+              <line x1="30" y1="35" x2="40" y2="35" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <p class="drop-primary" style="font-size:0.82rem"><strong>Click</strong> or drop .xlsx</p>
+          <span id="bcFileName" class="drop-filename"></span>
+        </div>
+        <input type="file" id="bcFileInput" accept=".xlsx" aria-hidden="true" />
+        <label class="option-row" style="margin-top:0.6rem;margin-bottom:0.75rem;font-size:0.82rem">
+          <input type="checkbox" id="bcHeaderCheckbox" checked />
+          First row is a header
+        </label>
+        <p id="bcErrorBox" class="error-box" hidden></p>
+        <p id="bcReadyMsg" style="font-size:0.78rem;color:#15803d;font-weight:500;margin-bottom:0.75rem" hidden></p>
+
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:0.5rem 0 0.75rem">
+
+        <!-- Filters (injected by buildBcFilters) -->
+        <p class="dash-sidebar-heading">Filters</p>
+        <div id="bcFilters"></div>
+
+      </aside>
+
+      <!-- Main -->
+      <main class="bc-main">
+
+        <!-- Current Status -->
+        <div class="bc-kpi-section" id="bcCurrentSection" hidden>
+          <p class="bc-section-label bc-section-label--blue">Current Status
+            <span id="bcCurrentFileTag" class="bc-file-tag"></span>
+          </p>
+          <div id="bcKpiCurrent"></div>
+        </div>
+
+        <!-- Baseline Status -->
+        <div class="bc-kpi-section" id="bcBaselineSection" hidden>
+          <p class="bc-section-label bc-section-label--amber">Baseline Status
+            <span id="bcBaselineFileTag" class="bc-file-tag"></span>
+          </p>
+          <div id="bcKpiBaseline"></div>
+        </div>
+
+        <!-- Progress -->
+        <div class="bc-kpi-section" id="bcProgressSection" hidden>
+          <p class="bc-section-label bc-section-label--green">Progress
+            <span class="bc-file-tag">Current vs Baseline</span>
+          </p>
+          <div id="bcProgressGrid"></div>
+        </div>
+
+        <!-- Delivered for Testing -->
+        <div class="bc-kpi-section" id="bcDeliveredSection" hidden>
+          <p class="bc-section-label bc-section-label--purple">Delivered for Testing
+            <span class="bc-file-tag">Baseline: TODO / INPROG → Current: TESTING / WAIT-INFO</span>
+          </p>
+          <div id="bcDeliveredCount" style="font-size:0.82rem;color:#57606a;margin-bottom:0.6rem"></div>
+          <table id="bcDeliveredTable" class="bc-dft-table"></table>
+        </div>
+
+        <!-- Returned Tickets -->
+        <div class="bc-kpi-section" id="bcReturnedSection" hidden>
+          <p class="bc-section-label bc-section-label--amber">Returned Tickets
+            <span class="bc-file-tag">Baseline: TESTING / WAIT-INFO → Current: TODO / INPROG</span>
+          </p>
+          <div id="bcReturnedCount" style="font-size:0.82rem;color:#57606a;margin-bottom:0.6rem"></div>
+          <table id="bcReturnedTable" class="bc-dft-table"></table>
+        </div>
+
+        <!-- Responsibility pies (current + baseline side-by-side) -->
+        <div id="bcRespSection" hidden style="display:none">
+          <div style="display:flex;flex-wrap:wrap;gap:1.25rem;align-items:flex-start">
+
+            <!-- Current Tickets Responsibility -->
+            <div class="bc-kpi-section" style="flex:1;min-width:280px;margin-bottom:0">
+              <p class="bc-section-label bc-section-label--purple">Current Tickets Responsibility
+                <span id="bcRespFileTag" class="bc-file-tag"></span>
+              </p>
+              <div id="bcRespContent" class="pie-row"></div>
+            </div>
+
+            <!-- Baseline Tickets Responsibility -->
+            <div class="bc-kpi-section" id="bcBaseRespSection" style="flex:1;min-width:280px;margin-bottom:0" hidden>
+              <p class="bc-section-label bc-section-label--amber">Baseline Tickets Responsibility
+                <span id="bcBaseRespFileTag" class="bc-file-tag"></span>
+              </p>
+              <div id="bcBaseRespContent" class="pie-row"></div>
+            </div>
+
+          </div>
+        </div>
+
+        <p id="bcHint" style="color:#57606a;font-size:0.875rem;padding:1rem 0">
+          Upload a baseline file and load a current file from the home page to compare KPIs side by side.
+        </p>
+
+      </main>
     </div>
   </div>
 
@@ -1031,6 +1351,13 @@
 
         </div>
 
+        <!-- Reopen Items panel -->
+        <div class="dash-full" id="reopenSection" hidden>
+          <p class="dash-panel-title" style="color:#b91c1c">Reopen Items</p>
+          <p id="reopenCount" style="font-size:0.82rem;font-weight:600;color:#1f2328;margin-bottom:0.75rem"></p>
+          <table id="reopenTable" class="update-result-table reopen-table"></table>
+        </div>
+
         <!-- Full-width burnout panel -->
         <div class="dash-full" id="dashFull" hidden>
           <div id="agingSection" class="aging-section" hidden>
@@ -1072,26 +1399,16 @@
       <h2>Update Tickets</h2>
       <p id="updateFileLabel" style="color:#57606a;font-size:0.875rem;margin-bottom:1.5rem"></p>
 
-      <div class="criteria-box">
-        <h3>Filter criteria applied</h3>
-        <table>
-          <thead><tr><th>Column</th><th>Position</th><th>Required value</th></tr></thead>
-          <tbody>
-            <tr><td>ID</td><td>1</td><td><em>returned</em></td></tr>
-            <tr><td>Status</td><td>3</td><td><code>DONE</code> or <code>CLOSED</code></td></tr>
-            <tr><td>Status date</td><td>4</td><td>≥ selected date</td></tr>
-            <tr><td>Group</td><td>5</td><td><code>HIS_GROUP</code></td></tr>
-            <tr><td>Type</td><td>6</td><td><code>Defect (Bug)</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
       <!-- Date + Type filter + Fetch -->
       <div id="updateDateControls" hidden>
         <div class="aging-controls" style="margin-bottom:0.6rem">
           <label>Status date from <input type="date" id="updateFromDate" /></label>
         </div>
         <div class="aging-controls">
+          <label style="align-items:center">
+            Group
+            <select id="updateGroupSelect" style="margin-left:0.4rem;font-size:0.875rem;border:1px solid #d0d7de;border-radius:5px;padding:0.3rem 0.55rem;color:#1f2328;background:#fff"></select>
+          </label>
           <label style="align-items:center">
             Type
             <select id="updateTypeSelect" style="margin-left:0.4rem;font-size:0.875rem;border:1px solid #d0d7de;border-radius:5px;padding:0.3rem 0.55rem;color:#1f2328;background:#fff"></select>
@@ -1102,9 +1419,26 @@
 
       <div id="errorBox" class="error-box" role="alert" hidden></div>
 
-      <section id="resultsSection" hidden>
-        <p id="resultCount"></p>
-        <ul id="resultsList"></ul>
+      <!-- Results: three independent sections -->
+      <section id="resolvedSection" class="update-result-section" hidden>
+        <h3 class="update-section-title update-section-title--green">Resolved Items</h3>
+        <p class="update-section-hint">Status DONE / CLOSED · col 4 (status date) ≥ selected date</p>
+        <p id="resolvedCount" class="update-section-count"></p>
+        <table id="resolvedTable" class="update-result-table"></table>
+      </section>
+
+      <section id="returnedSection" class="update-result-section" hidden>
+        <h3 class="update-section-title update-section-title--amber">Returned Items</h3>
+        <p class="update-section-hint">Status TODO · col 4 (status date) ≥ selected date · col 11 (created date) &lt; selected date</p>
+        <p id="returnedCount" class="update-section-count"></p>
+        <table id="returnedTable" class="update-result-table"></table>
+      </section>
+
+      <section id="newItemsSection" class="update-result-section" hidden>
+        <h3 class="update-section-title update-section-title--blue">New Items</h3>
+        <p class="update-section-hint">Status TODO · col 11 (created date) ≥ selected date</p>
+        <p id="newItemsCount" class="update-section-count"></p>
+        <table id="newItemsTable" class="update-result-table"></table>
       </section>
     </div>
   </div>

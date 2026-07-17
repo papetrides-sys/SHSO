@@ -34,6 +34,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const homeTagline       = document.getElementById("homeTagline");
   const tileGrid          = document.getElementById("tileGrid");
 
+  // ── Baseline Comparison file state (completely separate from sharedRows) ──
+  let bcRawRows    = [];
+  let bcRows       = [];      // after optional header skip
+  let bcFileName   = "";
+
+  const bcDropZone       = document.getElementById("bcDropZone");
+  const bcFileInput      = document.getElementById("bcFileInput");
+  const bcHeaderChk      = document.getElementById("bcHeaderCheckbox");
+  const bcFileNameEl     = document.getElementById("bcFileName");
+  const bcErrorBox       = document.getElementById("bcErrorBox");
+  const bcReadyMsg       = document.getElementById("bcReadyMsg");
+  const bcCurrentFileLbl = document.getElementById("bcCurrentFileLabel");
+
   function parseSharedFile(file) {
     homeErrorBox.hidden = true; homeErrorBox.textContent = "";
 
@@ -87,35 +100,645 @@ document.addEventListener("DOMContentLoaded", () => {
     initUpdate();
   });
 
+  // ── Baseline Comparison file handling ─────────────────────────────────────
+
+  // DOM refs for baseline dashboard sections
+  const bcFiltersEl       = document.getElementById("bcFilters");
+  const bcCurrentSection  = document.getElementById("bcCurrentSection");
+  const bcBaselineSection = document.getElementById("bcBaselineSection");
+  const bcKpiCurrent      = document.getElementById("bcKpiCurrent");
+  const bcKpiBaseline     = document.getElementById("bcKpiBaseline");
+  const bcCurrentFileTag  = document.getElementById("bcCurrentFileTag");
+  const bcBaselineFileTag = document.getElementById("bcBaselineFileTag");
+  const bcProgressSection  = document.getElementById("bcProgressSection");
+  const bcProgressGrid     = document.getElementById("bcProgressGrid");
+  const bcDeliveredSection = document.getElementById("bcDeliveredSection");
+  const bcDeliveredCount   = document.getElementById("bcDeliveredCount");
+  const bcDeliveredTable   = document.getElementById("bcDeliveredTable");
+  const bcReturnedSection  = document.getElementById("bcReturnedSection");
+  const bcReturnedCount    = document.getElementById("bcReturnedCount");
+  const bcReturnedTable    = document.getElementById("bcReturnedTable");
+  const bcRespSection      = document.getElementById("bcRespSection");
+  const bcRespContent      = document.getElementById("bcRespContent");
+  const bcRespFileTag      = document.getElementById("bcRespFileTag");
+  const bcBaseRespSection  = document.getElementById("bcBaseRespSection");
+  const bcBaseRespContent  = document.getElementById("bcBaseRespContent");
+  const bcBaseRespFileTag  = document.getElementById("bcBaseRespFileTag");
+  const bcHint             = document.getElementById("bcHint");
+
+  // Baseline-scoped filter selections (union of both files' values)
+  let bcSelectedGroups      = new Set();
+  let bcSelectedTypes       = new Set();
+  let bcSelectedSeverities  = new Set();
+  let bcSelectedFixVersions = new Set();
+
+  /** Union unique values from both files for a given column index */
+  function bcUnionValues(colIndex) {
+    const s = new Set();
+    for (const row of [...sharedRows, ...bcRows]) {
+      if (row.length > colIndex && row[colIndex] != null)
+        s.add(String(row[colIndex]).trim());
+    }
+    return s;
+  }
+
+  function bcUnionSeverities() {
+    const s = new Set();
+    for (const row of [...sharedRows, ...bcRows]) {
+      if (row.length > 11) s.add(severityLabel(row[11]));
+    }
+    return s;
+  }
+
+  function bcUnionLastCol() {
+    const s = new Set();
+    for (const row of [...sharedRows, ...bcRows]) {
+      if (row.length > 0 && row[row.length - 1] != null)
+        s.add(String(row[row.length - 1]).trim());
+    }
+    return s;
+  }
+
+  /** Filter a set of rows using the BC filter selections */
+  function bcApplyFilters(rows) {
+    return rows.filter(row => {
+      const group      = row.length > 4 && row[4] != null ? String(row[4]).trim() : "(blank)";
+      const type       = row.length > 5 && row[5] != null ? String(row[5]).trim() : "(blank)";
+      const severity   = severityLabel(row.length > 11 ? row[11] : null);
+      const fixVersion = row.length > 0 && row[row.length - 1] != null
+        ? String(row[row.length - 1]).trim() : "(blank)";
+      return bcSelectedGroups.has(group) && bcSelectedTypes.has(type)
+          && bcSelectedSeverities.has(severity) && bcSelectedFixVersions.has(fixVersion);
+    });
+  }
+
+  function buildBcFilters() {
+    bcFiltersEl.innerHTML = "";
+    if (!sharedRows.length && !bcRows.length) return;
+
+    const SEVERITY_ORDER = ["Critical", "Major", "Medium", "Low"];
+
+    function addChipGroup(label, selectedSet, values, setterFn) {
+      bcFiltersEl.appendChild(chipGroup(
+        label, selectedSet, [...values].sort(),
+        val => {
+          selectedSet.has(val) ? selectedSet.delete(val) : selectedSet.add(val);
+          refreshBcKpis();
+        },
+        () => {
+          if (selectedSet.size === values.size) { selectedSet.clear(); }
+          else { setterFn(new Set(values)); }
+          buildBcFilters();
+          refreshBcKpis();
+        }
+      ));
+    }
+
+    const allGroups   = bcUnionValues(4);
+    const allTypes    = bcUnionValues(5);
+    const allSevs     = bcUnionSeverities();
+    const allFix      = bcUnionLastCol();
+    const sevOrdered  = SEVERITY_ORDER.filter(l => allSevs.has(l));
+    for (const l of allSevs) { if (!SEVERITY_ORDER.includes(l)) sevOrdered.push(l); }
+
+    addChipGroup("Group",       bcSelectedGroups,      allGroups, v => { bcSelectedGroups      = v; });
+    addChipGroup("Ticket Type", bcSelectedTypes,       allTypes,  v => { bcSelectedTypes       = v; });
+    bcFiltersEl.appendChild(chipGroup(
+      "Severity", bcSelectedSeverities, sevOrdered,
+      val => { bcSelectedSeverities.has(val) ? bcSelectedSeverities.delete(val) : bcSelectedSeverities.add(val); refreshBcKpis(); },
+      () => {
+        if (bcSelectedSeverities.size === allSevs.size) { bcSelectedSeverities.clear(); }
+        else { bcSelectedSeverities = new Set(allSevs); }
+        buildBcFilters(); refreshBcKpis();
+      }
+    ));
+    addChipGroup("Fix Version", bcSelectedFixVersions, allFix,   v => { bcSelectedFixVersions  = v; });
+  }
+
+  function refreshBcKpis() {
+    const hasCurrentFile  = sharedRows.length > 0;
+    const hasBaselineFile = bcRows.length > 0;
+    const hasBoth         = hasCurrentFile && hasBaselineFile;
+
+    bcHint.hidden = hasCurrentFile || hasBaselineFile;
+    bcCurrentSection.hidden  = !hasCurrentFile;
+    bcBaselineSection.hidden = !hasBaselineFile;
+    bcProgressSection.hidden  = !hasBoth;
+    bcDeliveredSection.hidden = !hasBoth;
+    bcReturnedSection.hidden  = !hasBoth;
+    bcRespSection.style.display  = (hasCurrentFile || hasBaselineFile) ? "" : "none";
+    bcRespSection.hidden         = false;
+    bcBaseRespSection.hidden     = !hasBaselineFile;
+
+    let currentKpis  = null;
+    let baselineKpis = null;
+    let currentTesting  = 0;
+    let baselineTesting = 0;
+    let filteredCurrent  = [];
+    let filteredBaseline = [];
+
+    if (hasCurrentFile) {
+      filteredCurrent = bcApplyFilters(sharedRows);
+      currentKpis     = computeKpis(filteredCurrent);
+      currentTesting  = filteredCurrent.filter(r => (r[2] != null ? String(r[2]).trim().toUpperCase() : "") === "TESTING").length;
+      bcKpiCurrent.innerHTML = "";
+      bcKpiCurrent.appendChild(renderKpiStrip(currentKpis, filteredCurrent));
+      bcCurrentFileTag.textContent = `— ${sharedFileName}`;
+
+      // Current Tickets Responsibility pie
+      bcRespContent.innerHTML = "";
+      bcRespContent.appendChild(pieBlock(
+        "Current Tickets Responsibility",
+        groupedTally(filteredCurrent, respGroupLabel),
+        filteredCurrent,
+        respGroupLabel,
+        lbl => RESP_GROUP_COLORS[lbl] ?? COLORS[0]
+      ));
+      bcRespFileTag.textContent = `— ${sharedFileName}`;
+    }
+    if (hasBaselineFile) {
+      filteredBaseline = bcApplyFilters(bcRows);
+      baselineKpis     = computeKpis(filteredBaseline);
+      baselineTesting  = filteredBaseline.filter(r => (r[2] != null ? String(r[2]).trim().toUpperCase() : "") === "TESTING").length;
+      bcKpiBaseline.innerHTML = "";
+      bcKpiBaseline.appendChild(renderKpiStrip(baselineKpis, filteredBaseline));
+      bcBaselineFileTag.textContent = `— ${bcFileName}`;
+
+      // Baseline Tickets Responsibility pie
+      bcBaseRespContent.innerHTML = "";
+      bcBaseRespContent.appendChild(pieBlock(
+        "Baseline Tickets Responsibility",
+        groupedTally(filteredBaseline, respGroupLabel),
+        filteredBaseline,
+        respGroupLabel,
+        lbl => RESP_GROUP_COLORS[lbl] ?? COLORS[0]
+      ));
+      bcBaseRespFileTag.textContent = `— ${bcFileName}`;
+    }
+    if (hasBoth) {
+      renderBcProgress(currentKpis, baselineKpis, currentTesting, baselineTesting);
+      renderBcDelivered(filteredCurrent, filteredBaseline);
+      renderBcReturned(filteredCurrent, filteredBaseline);
+    }
+  }
+
+  /**
+   * Render the Progress comparison grid.
+   * For each KPI, show current value, baseline value, delta and a
+   * colour-coded badge indicating whether the change is better/worse/neutral.
+   *
+   * "Better" direction per KPI:
+   *   total          → neutral (pure size, no good/bad)
+   *   resolved       → higher is better
+   *   resolutionRate → higher is better
+   *   throughputLast30 → higher is better
+   *   openOver30     → lower is better
+   */
+  function renderBcProgress(cur, base, currentTesting, baselineTesting) {
+    bcProgressGrid.innerHTML = "";
+
+    const grid = document.createElement("div");
+    grid.className = "bc-progress-grid";
+
+    const defs = [
+      {
+        label: "Total Tickets",
+        cur:   cur.total,
+        base:  base.total,
+        fmt:   v => String(v),
+        direction: "neutral",
+      },
+      {
+        label: "Resolved",
+        cur:   cur.resolved,
+        base:  base.resolved,
+        fmt:   v => String(v),
+        direction: "higher-better",
+      },
+      {
+        label: "Resolution Rate",
+        cur:   cur.resolutionRate,
+        base:  base.resolutionRate,
+        fmt:   v => v.toFixed(1) + "%",
+        direction: "higher-better",
+      },
+      {
+        label: "Resolved (Last 30 d)",
+        cur:   cur.throughputLast30,
+        base:  base.throughputLast30,
+        fmt:   v => String(v),
+        direction: "higher-better",
+      },
+      {
+        label: "Open > 30 Days",
+        cur:   cur.openOver30,
+        base:  base.openOver30,
+        fmt:   v => String(v),
+        direction: "lower-better",
+      },
+      {
+        label: "In Testing",
+        cur:   currentTesting,
+        base:  baselineTesting,
+        fmt:   v => String(v),
+        direction: "lower-better",
+      },
+      {
+        label: "Tickets on OTE",
+        cur:   cur.ticketsOnOte,
+        base:  base.ticketsOnOte,
+        fmt:   v => String(v),
+        direction: "lower-better",
+      },
+      {
+        label: "On SHSO",
+        cur:   cur.ticketsOnShso,
+        base:  base.ticketsOnShso,
+        fmt:   v => String(v),
+        direction: "lower-better",
+      },
+    ];
+
+    for (const def of defs) {
+      const delta     = def.cur - def.base;
+      const absDelta  = Math.abs(delta);
+      const isNum     = def.label !== "Resolution Rate";
+
+      // Format the delta display
+      const deltaFmt  = def.label === "Resolution Rate"
+        ? (delta >= 0 ? "+" : "") + delta.toFixed(1) + "%"
+        : (delta >= 0 ? "+" : "") + String(Math.round(delta));
+
+      // Determine badge class
+      let badgeClass = "bc-delta--neutral";
+      let arrow = "→";
+      if (delta !== 0) {
+        const improvement =
+          (def.direction === "higher-better" && delta > 0) ||
+          (def.direction === "lower-better"  && delta < 0);
+        if (improvement) {
+          badgeClass = "bc-delta--better";
+          arrow = "▲";
+        } else if (def.direction !== "neutral") {
+          badgeClass = "bc-delta--worse";
+          arrow = "▼";
+        }
+      }
+
+      const card = document.createElement("div");
+      card.className = "bc-progress-card";
+      card.innerHTML =
+        `<div class="bc-progress-kpi-label">${def.label}</div>
+         <div class="bc-progress-row">
+           <span>Current</span>
+           <span class="bc-progress-val">${def.fmt(def.cur)}</span>
+         </div>
+         <div class="bc-progress-row">
+           <span>Baseline</span>
+           <span class="bc-progress-val" style="color:#57606a;font-size:0.9rem">${def.fmt(def.base)}</span>
+         </div>
+         <div class="bc-delta ${badgeClass}">${arrow} ${delta === 0 ? "No change" : deltaFmt}</div>`;
+
+      grid.appendChild(card);
+    }
+
+    bcProgressGrid.appendChild(grid);
+  }
+
+  /**
+   * Render the "Delivered for Testing" section.
+   * Items qualify when:
+   *   - They appear in the baseline with status TODO or INPROG
+   *   - They appear in the current file (matched by ID, col 0) with status TESTING or WAIT-INFO
+   * The table shows: ID, Description, Status, Severity, Fix Version.
+   * Sort order: Fix Version (ascending) then Severity numeric (1 < 2 < 3 < 4).
+   */
+  function renderBcDelivered(currentRows, baselineRows) {
+    // Build a set of baseline IDs that were TODO or INPROG
+    const BASE_STATUSES = new Set(["TODO", "INPROG"]);
+    const baselineIds = new Set();
+    for (const row of baselineRows) {
+      const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      if (BASE_STATUSES.has(st) && row[0] != null) {
+        baselineIds.add(String(row[0]).trim());
+      }
+    }
+
+    // Find current rows whose ID was in baseline TODO/INPROG and are now TESTING or WAIT-INFO
+    const CUR_STATUSES = new Set(["TESTING", "WAIT-INFO"]);
+    const SEV_ORDER = { "1": 1, "2": 2, "3": 3, "4": 4 };
+
+    let delivered = currentRows.filter(row => {
+      const id = row[0] != null ? String(row[0]).trim() : "";
+      const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      return id !== "" && baselineIds.has(id) && CUR_STATUSES.has(st);
+    });
+
+    // Sort: Fix Version asc (last col), then severity numeric asc
+    delivered.sort((a, b) => {
+      const fa = a.length > 0 && a[a.length - 1] != null ? String(a[a.length - 1]) : "";
+      const fb = b.length > 0 && b[b.length - 1] != null ? String(b[b.length - 1]) : "";
+      const fCmp = fa.localeCompare(fb, undefined, { numeric: true, sensitivity: "base" });
+      if (fCmp !== 0) return fCmp;
+      const sa = SEV_ORDER[String(a.length > 11 && a[11] != null ? a[11] : "").trim()] ?? 99;
+      const sb = SEV_ORDER[String(b.length > 11 && b[11] != null ? b[11] : "").trim()] ?? 99;
+      return sa - sb;
+    });
+
+    // Count badge
+    bcDeliveredCount.textContent = delivered.length === 0
+      ? "No items moved into testing since baseline."
+      : `${delivered.length} item${delivered.length === 1 ? "" : "s"} delivered for testing`;
+
+    // Build table
+    bcDeliveredTable.innerHTML =
+      `<thead><tr>
+        <th>ID</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Severity</th>
+        <th>Fix Version</th>
+      </tr></thead>`;
+
+    if (delivered.length === 0) {
+      bcDeliveredTable.innerHTML = "";
+      return;
+    }
+
+    const tbody = document.createElement("tbody");
+    for (const row of delivered) {
+      const tr = document.createElement("tr");
+
+      // ID — col 0
+      const tdId = document.createElement("td");
+      tdId.textContent = row[0] != null ? String(row[0]) : "";
+      tr.appendChild(tdId);
+
+      // Description — col 1
+      const tdDesc = document.createElement("td");
+      tdDesc.className = "bc-dft-td-desc";
+      tdDesc.textContent = row[1] != null ? String(row[1]) : "";
+      tr.appendChild(tdDesc);
+
+      // Status — col 2
+      const tdStatus = document.createElement("td");
+      tdStatus.className = "bc-dft-td-status";
+      tdStatus.textContent = row[2] != null ? String(row[2]).trim() : "";
+      tr.appendChild(tdStatus);
+
+      // Severity — col 11
+      const tdSev = document.createElement("td");
+      tdSev.className = "bc-dft-td-sev";
+      tdSev.textContent = severityLabel(row.length > 11 ? row[11] : null);
+      tr.appendChild(tdSev);
+
+      // Fix Version — last column
+      const tdFix = document.createElement("td");
+      tdFix.className = "bc-dft-td-fix";
+      tdFix.textContent = row.length > 0 && row[row.length - 1] != null
+        ? String(row[row.length - 1]) : "";
+      tr.appendChild(tdFix);
+
+      tbody.appendChild(tr);
+    }
+    bcDeliveredTable.appendChild(tbody);
+  }
+
+  /**
+   * Render the "Returned Tickets" section.
+   * Items qualify when:
+   *   - They appear in the baseline with status TESTING or WAIT-INFO
+   *   - They appear in the current file (matched by ID, col 0) with status TODO or INPROG
+   * The table shows: ID, Description, Status, Severity, Fix Version.
+   * Sort order: Fix Version (ascending) then Severity numeric (1 < 2 < 3 < 4).
+   */
+  function renderBcReturned(currentRows, baselineRows) {
+    // Build a set of baseline IDs that were TESTING or WAIT-INFO
+    const BASE_STATUSES = new Set(["TESTING", "WAIT-INFO"]);
+    const baselineIds = new Set();
+    for (const row of baselineRows) {
+      const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      if (BASE_STATUSES.has(st) && row[0] != null) {
+        baselineIds.add(String(row[0]).trim());
+      }
+    }
+
+    // Find current rows whose ID was in baseline TESTING/WAIT-INFO and are now TODO or INPROG
+    const CUR_STATUSES = new Set(["TODO", "INPROG"]);
+    const SEV_ORDER = { "1": 1, "2": 2, "3": 3, "4": 4 };
+
+    let returned = currentRows.filter(row => {
+      const id = row[0] != null ? String(row[0]).trim() : "";
+      const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      return id !== "" && baselineIds.has(id) && CUR_STATUSES.has(st);
+    });
+
+    // Sort: Fix Version asc (last col), then severity numeric asc
+    returned.sort((a, b) => {
+      const fa = a.length > 0 && a[a.length - 1] != null ? String(a[a.length - 1]) : "";
+      const fb = b.length > 0 && b[b.length - 1] != null ? String(b[b.length - 1]) : "";
+      const fCmp = fa.localeCompare(fb, undefined, { numeric: true, sensitivity: "base" });
+      if (fCmp !== 0) return fCmp;
+      const sa = SEV_ORDER[String(a.length > 11 && a[11] != null ? a[11] : "").trim()] ?? 99;
+      const sb = SEV_ORDER[String(b.length > 11 && b[11] != null ? b[11] : "").trim()] ?? 99;
+      return sa - sb;
+    });
+
+    // Count line
+    bcReturnedCount.textContent = returned.length === 0
+      ? "No items returned to development since baseline."
+      : `${returned.length} item${returned.length === 1 ? "" : "s"} returned to development`;
+
+    // Build table
+    if (returned.length === 0) {
+      bcReturnedTable.innerHTML = "";
+      return;
+    }
+
+    bcReturnedTable.innerHTML =
+      `<thead><tr>
+        <th>ID</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Severity</th>
+        <th>Fix Version</th>
+      </tr></thead>`;
+
+    const tbody = document.createElement("tbody");
+    for (const row of returned) {
+      const tr = document.createElement("tr");
+
+      // ID — col 0
+      const tdId = document.createElement("td");
+      tdId.textContent = row[0] != null ? String(row[0]) : "";
+      tr.appendChild(tdId);
+
+      // Description — col 1
+      const tdDesc = document.createElement("td");
+      tdDesc.className = "bc-dft-td-desc";
+      tdDesc.textContent = row[1] != null ? String(row[1]) : "";
+      tr.appendChild(tdDesc);
+
+      // Status — col 2
+      const tdStatus = document.createElement("td");
+      tdStatus.className = "bc-dft-td-status";
+      tdStatus.textContent = row[2] != null ? String(row[2]).trim() : "";
+      tr.appendChild(tdStatus);
+
+      // Severity — col 11
+      const tdSev = document.createElement("td");
+      tdSev.className = "bc-dft-td-sev";
+      tdSev.textContent = severityLabel(row.length > 11 ? row[11] : null);
+      tr.appendChild(tdSev);
+
+      // Fix Version — last column
+      const tdFix = document.createElement("td");
+      tdFix.className = "bc-dft-td-fix";
+      tdFix.textContent = row.length > 0 && row[row.length - 1] != null
+        ? String(row[row.length - 1]) : "";
+      tr.appendChild(tdFix);
+
+      tbody.appendChild(tr);
+    }
+    bcReturnedTable.appendChild(tbody);
+  }
+
+  function parseBcFile(file) {
+    bcErrorBox.hidden = true; bcErrorBox.textContent = "";
+    bcReadyMsg.hidden = true;
+
+    if (!file.name.endsWith(".xlsx")) {
+      bcErrorBox.textContent = "Only .xlsx files are supported.";
+      bcErrorBox.hidden = false;
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        bcRawRows  = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        bcFileName = file.name;
+        applyBcHeaderSkip();
+        bcFileNameEl.textContent = file.name;
+        bcReadyMsg.textContent   = `✓ ${file.name} — ${bcRows.length} row${bcRows.length === 1 ? "" : "s"}`;
+        bcReadyMsg.hidden        = false;
+        // Re-init filters from the union of both files, then refresh KPIs
+        bcSelectedGroups      = bcUnionValues(4);
+        bcSelectedTypes       = bcUnionValues(5);
+        bcSelectedSeverities  = bcUnionSeverities();
+        bcSelectedFixVersions = bcUnionLastCol();
+        buildBcFilters();
+        refreshBcKpis();
+      } catch (err) {
+        bcErrorBox.textContent = "Failed to parse the file: " + err.message;
+        bcErrorBox.hidden = false;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function applyBcHeaderSkip() {
+    bcRows = (bcHeaderChk.checked && bcRawRows.length) ? bcRawRows.slice(1) : bcRawRows;
+  }
+
+  bcFileInput.addEventListener("change", () => {
+    if (bcFileInput.files.length) parseBcFile(bcFileInput.files[0]);
+  });
+  bcDropZone.addEventListener("dragover",  e => { e.preventDefault(); bcDropZone.classList.add("drag-over"); });
+  bcDropZone.addEventListener("dragleave", ()  => bcDropZone.classList.remove("drag-over"));
+  bcDropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    bcDropZone.classList.remove("drag-over");
+    if (e.dataTransfer.files[0]) parseBcFile(e.dataTransfer.files[0]);
+  });
+  bcDropZone.addEventListener("click", () => bcFileInput.click());
+  bcHeaderChk.addEventListener("change", () => {
+    if (!bcRawRows.length) return;
+    applyBcHeaderSkip();
+    bcReadyMsg.textContent = `✓ ${bcFileName} — ${bcRows.length} row${bcRows.length === 1 ? "" : "s"}`;
+    bcSelectedGroups      = bcUnionValues(4);
+    bcSelectedTypes       = bcUnionValues(5);
+    bcSelectedSeverities  = bcUnionSeverities();
+    bcSelectedFixVersions = bcUnionLastCol();
+    buildBcFilters();
+    refreshBcKpis();
+  });
+
+  function initBaseline() {
+    bcCurrentFileLbl.textContent = sharedFileName ? sharedFileName : "";
+    bcErrorBox.hidden = true; bcErrorBox.textContent = "";
+    // Refresh filters and KPIs in case the current file changed since last visit
+    if (sharedRows.length || bcRows.length) {
+      bcSelectedGroups      = bcUnionValues(4);
+      bcSelectedTypes       = bcUnionValues(5);
+      bcSelectedSeverities  = bcUnionSeverities();
+      bcSelectedFixVersions = bcUnionLastCol();
+      buildBcFilters();
+    }
+    refreshBcKpis();
+  }
+
   // ── Home tile navigation ───────────────────────────────────────────────────
   document.getElementById("tileStats").addEventListener("click",  () => { showView("viewStats");  initStats();  });
   document.getElementById("tileUpdate").addEventListener("click", () => { showView("viewUpdate"); initUpdate(); });
+  document.getElementById("tileBaseline").addEventListener("click", () => { showView("viewBaseline"); initBaseline(); });
   document.getElementById("tileStats").addEventListener("keydown",  e => { if (e.key === "Enter" || e.key === " ") { showView("viewStats");  initStats();  } });
   document.getElementById("tileUpdate").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { showView("viewUpdate"); initUpdate(); } });
+  document.getElementById("tileBaseline").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { showView("viewBaseline"); initBaseline(); } });
 
   // Back buttons
-  document.getElementById("backFromStats").addEventListener("click",  () => showView("viewHome"));
-  document.getElementById("backFromUpdate").addEventListener("click", () => showView("viewHome"));
+  document.getElementById("backFromStats").addEventListener("click",    () => showView("viewHome"));
+  document.getElementById("backFromUpdate").addEventListener("click",   () => showView("viewHome"));
+  document.getElementById("backFromBaseline").addEventListener("click", () => showView("viewHome"));
 
   // ── Update Tickets ─────────────────────────────────────────────────────────
   const updateDateControls = document.getElementById("updateDateControls");
   const updateFromDate     = document.getElementById("updateFromDate");
+  const updateGroupSelect  = document.getElementById("updateGroupSelect");
   const updateTypeSelect   = document.getElementById("updateTypeSelect");
   const updateFetch        = document.getElementById("updateFetch");
-  const resultsSection     = document.getElementById("resultsSection");
-  const resultsList        = document.getElementById("resultsList");
-  const resultCount        = document.getElementById("resultCount");
   const errorBox           = document.getElementById("errorBox");
   const updateFileLabel    = document.getElementById("updateFileLabel");
+
+  const resolvedSection  = document.getElementById("resolvedSection");
+  const resolvedCount    = document.getElementById("resolvedCount");
+  const resolvedTable    = document.getElementById("resolvedTable");
+  const returnedSection  = document.getElementById("returnedSection");
+  const returnedCount    = document.getElementById("returnedCount");
+  const returnedTable    = document.getElementById("returnedTable");
+  const newItemsSection  = document.getElementById("newItemsSection");
+  const newItemsCount    = document.getElementById("newItemsCount");
+  const newItemsTable    = document.getElementById("newItemsTable");
 
   function initUpdate() {
     if (!sharedRows.length) return;
     updateFileLabel.textContent = `File: ${sharedFileName}`;
     errorBox.hidden = true; errorBox.textContent = "";
-    resultsSection.hidden = true;
+    [resolvedSection, returnedSection, newItemsSection].forEach(s => s.hidden = true);
     updateDateControls.hidden = true;
 
-    // Populate Type select from unique col-6 values
+    // Default status date to today
+    if (!updateFromDate.value) {
+      const today = new Date();
+      updateFromDate.value =
+        `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    }
+
+    // Populate Group select from unique col-5 values (index 4)
+    const groups = [...new Set(
+      sharedRows.map(r => r[4] != null ? String(r[4]).trim() : null).filter(v => v)
+    )].sort();
+
+    updateGroupSelect.innerHTML = `<option value="">All groups</option>`;
+    for (const g of groups) {
+      const opt = document.createElement("option");
+      opt.value = g; opt.textContent = g;
+      updateGroupSelect.appendChild(opt);
+    }
+
+    // Populate Type select from unique col-6 values (index 5)
     const types = [...new Set(
       sharedRows.map(r => r[5] != null ? String(r[5]).trim() : null).filter(v => v)
     )].sort();
@@ -131,7 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   updateFetch.addEventListener("click", () => {
     errorBox.hidden = true; errorBox.textContent = "";
-    resultsSection.hidden = true;
+    [resolvedSection, returnedSection, newItemsSection].forEach(s => s.hidden = true);
 
     if (!updateFromDate.value) {
       errorBox.textContent = "Please select a status date.";
@@ -139,24 +762,56 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const fromDate     = new Date(updateFromDate.value + "T00:00:00Z");
-    const selectedType = updateTypeSelect.value;
-    const VALID_STATUSES = new Set(["DONE", "CLOSED"]);
+    const fromDate      = new Date(updateFromDate.value + "T00:00:00Z");
+    const selectedGroup = updateGroupSelect.value;   // "" = All groups
+    const selectedType  = updateTypeSelect.value;
+    const DONE_SET      = new Set(["DONE", "CLOSED"]);
 
-    const filtered = sharedRows.filter(row => {
-      if (row.length < 6) return false;
-      const status = row[2] != null ? String(row[2]).trim() : "";
-      const group  = row[4] != null ? String(row[4]).trim() : "";
+    // Shared group predicate — passes when no group is selected or group matches
+    const matchesGroup = row => {
+      if (!selectedGroup) return true;
+      const g = row[4] != null ? String(row[4]).trim() : "";
+      return g === selectedGroup;
+    };
+
+    // ── Section 1: Resolved — status DONE/CLOSED, col 4 (index 3) >= fromDate ─
+    const resolved = sharedRows.filter(row => {
+      const status = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
       const type   = row[5] != null ? String(row[5]).trim() : "";
-      if (!VALID_STATUSES.has(status)) return false;
-      if (group !== "HIS_GROUP")       return false;
-      if (type  !== selectedType)      return false;
+      if (!DONE_SET.has(status)) return false;
+      if (type !== selectedType)  return false;
+      if (!matchesGroup(row))     return false;
       const d = parseDateVal(row[3]);
       return d !== null && d >= fromDate;
     });
 
-    const ids = filtered.map(row => row[0]).filter(id => id != null);
-    renderUpdateResults(ids);
+    // ── Section 2: Returned — status TODO, col 4 >= fromDate, col 11 < fromDate
+    const returned = sharedRows.filter(row => {
+      const status = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      const type   = row[5] != null ? String(row[5]).trim() : "";
+      if (status !== "TODO")     return false;
+      if (type !== selectedType) return false;
+      if (!matchesGroup(row))    return false;
+      const statusDate  = parseDateVal(row[3]);
+      const createdDate = parseDateVal(row[10]);
+      return statusDate !== null && statusDate >= fromDate &&
+             createdDate !== null && createdDate < fromDate;
+    });
+
+    // ── Section 3: New Items — status TODO, col 11 (index 10) >= fromDate ──────
+    const newItems = sharedRows.filter(row => {
+      const status = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      const type   = row[5] != null ? String(row[5]).trim() : "";
+      if (status !== "TODO")     return false;
+      if (type !== selectedType) return false;
+      if (!matchesGroup(row))    return false;
+      const createdDate = parseDateVal(row[10]);
+      return createdDate !== null && createdDate >= fromDate;
+    });
+
+    renderSection(resolvedSection,  resolvedCount,  resolvedTable,  resolved,  "resolved item");
+    renderSection(returnedSection,  returnedCount,  returnedTable,  returned,  "returned item");
+    renderSection(newItemsSection,  newItemsCount,  newItemsTable,  newItems,  "new item");
   });
 
   /** Parse an Excel date serial or string into a UTC midnight Date, or null */
@@ -173,17 +828,70 @@ document.addEventListener("DOMContentLoaded", () => {
     return isNaN(d) ? null : new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   }
 
-  function renderUpdateResults(ids) {
-    resultsList.innerHTML = "";
-    if (ids.length === 0) {
-      resultCount.textContent = "No matching records found.";
-    } else {
-      resultCount.textContent = `Found ${ids.length} matching ID${ids.length === 1 ? "" : "s"}:`;
-      const li = document.createElement("li");
-      li.textContent = ids.join(", ");
-      resultsList.appendChild(li);
+  /** Format a date cell value as DD/MM/YYYY, or blank if unparseable */
+  function fmtDateCell(val) {
+    const d = parseDateVal(val);
+    if (!d) return "";
+    return `${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;
+  }
+
+  /** Render a result section as a table: Ticket No · Summary · Status Date · Severity · Fix Version */
+  function renderSection(section, countEl, tableEl, rows, label) {
+    tableEl.innerHTML = "";
+    countEl.textContent = rows.length === 0
+      ? `No ${label}s found.`
+      : `${rows.length} ${label}${rows.length === 1 ? "" : "s"}`;
+
+    if (rows.length === 0) { section.hidden = false; return; }
+
+    // Header
+    tableEl.innerHTML =
+      `<thead><tr>
+        <th>Ticket Number</th>
+        <th>Summary</th>
+        <th>Status Date</th>
+        <th>Severity</th>
+        <th>Fix Version</th>
+      </tr></thead>`;
+
+    const tbody = document.createElement("tbody");
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+
+      // Ticket Number — col 1 (index 0)
+      const tdId = document.createElement("td");
+      tdId.textContent = row[0] != null ? String(row[0]) : "";
+      tr.appendChild(tdId);
+
+      // Summary — col 2 (index 1)
+      const tdSum = document.createElement("td");
+      tdSum.className = "update-td-summary";
+      tdSum.textContent = row[1] != null ? String(row[1]) : "";
+      tr.appendChild(tdSum);
+
+      // Status Date — col 4 (index 3)
+      const tdDate = document.createElement("td");
+      tdDate.className = "update-td-date";
+      tdDate.textContent = fmtDateCell(row[3]);
+      tr.appendChild(tdDate);
+
+      // Severity — col 12 (index 11), mapped via severityLabel()
+      const tdSev = document.createElement("td");
+      tdSev.className = "update-td-sev";
+      tdSev.textContent = severityLabel(row.length > 11 ? row[11] : null);
+      tr.appendChild(tdSev);
+
+      // Fix Version — last column
+      const tdFix = document.createElement("td");
+      tdFix.className = "update-td-fix";
+      tdFix.textContent = row.length > 0 && row[row.length - 1] != null
+        ? String(row[row.length - 1]) : "";
+      tr.appendChild(tdFix);
+
+      tbody.appendChild(tr);
     }
-    resultsSection.hidden = false;
+    tableEl.appendChild(tbody);
+    section.hidden = false;
   }
 
   // ── Statistics wiring ──────────────────────────────────────────────────────
@@ -194,6 +902,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const dashKpiRow     = document.getElementById("dashKpiRow");
   const dashGrid       = document.getElementById("dashGrid");
   const dashFull       = document.getElementById("dashFull");
+  const reopenSection  = document.getElementById("reopenSection");
+  const reopenCount    = document.getElementById("reopenCount");
+  const reopenTable    = document.getElementById("reopenTable");
 
   // ── Sidebar collapse toggle ────────────────────────────────────────────────
   const dashSidebar       = document.getElementById("dashSidebar");
@@ -202,6 +913,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const collapsed = dashSidebar.classList.toggle("collapsed");
     dashSidebarToggle.textContent = (collapsed ? "\u25B6" : "\u25BC") + " Filters";
     dashSidebarToggle.setAttribute("aria-expanded", String(!collapsed));
+  });
+
+  // ── Baseline sidebar collapse toggle ──────────────────────────────────────
+  const bcSidebar       = document.getElementById("bcSidebar");
+  const bcSidebarToggle = document.getElementById("bcSidebarToggle");
+  bcSidebarToggle.addEventListener("click", () => {
+    const collapsed = bcSidebar.classList.toggle("collapsed");
+    bcSidebarToggle.textContent = (collapsed ? "\u25B6" : "\u25BC") + " Filters";
+    bcSidebarToggle.setAttribute("aria-expanded", String(!collapsed));
   });
 
   // Raw data rows (set once per file load; never mutated)
@@ -237,6 +957,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chartsArea.hidden = true;   chartsArea.innerHTML = "";
     dashKpiRow.innerHTML = ""; dashKpiRow.hidden = true;
     dashFull.hidden = true;
+    reopenSection.hidden = true; reopenTable.innerHTML = "";
     [bugsCreationSection, enhCreationSection, opCreationSection].forEach(s => {
       s.hidden = true; s.innerHTML = "";
     });
@@ -423,8 +1144,76 @@ document.addEventListener("DOMContentLoaded", () => {
     dashKpiRow.innerHTML = "";
     renderCharts(filteredRows());
     buildCol16Section(filteredRows());
+    buildReopenSection();
     // keep aging chart in sync when filters change
     refreshAging();
+  }
+
+  function buildReopenSection() {
+    reopenTable.innerHTML = "";
+    reopenSection.hidden = true;
+
+    // Today at UTC midnight — independent of sidebar filters
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+
+    const rows = allRows.filter(row => {
+      const status = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      if (status !== "TODO") return false;
+      const statusDate  = parseDateVal(row[3]);
+      const createdDate = parseDateVal(row[10]);
+      return statusDate  !== null && statusDate  >= today &&
+             createdDate !== null && createdDate <  today;
+    });
+
+    reopenCount.textContent = rows.length === 0
+      ? "No reopen items found."
+      : `${rows.length} item${rows.length === 1 ? "" : "s"}`;
+
+    if (rows.length === 0) { reopenSection.hidden = false; return; }
+
+    reopenTable.innerHTML =
+      `<thead><tr>
+        <th>Ticket Number</th>
+        <th>Summary</th>
+        <th>Status Date</th>
+        <th>Severity</th>
+        <th>Fix Version</th>
+      </tr></thead>`;
+
+    const tbody = document.createElement("tbody");
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+
+      const tdId = document.createElement("td");
+      tdId.textContent = row[0] != null ? String(row[0]) : "";
+      tr.appendChild(tdId);
+
+      const tdSum = document.createElement("td");
+      tdSum.className = "update-td-summary";
+      tdSum.textContent = row[1] != null ? String(row[1]) : "";
+      tr.appendChild(tdSum);
+
+      const tdDate = document.createElement("td");
+      tdDate.className = "update-td-date";
+      tdDate.textContent = fmtDateCell(row[3]);
+      tr.appendChild(tdDate);
+
+      const tdSev = document.createElement("td");
+      tdSev.className = "update-td-sev";
+      tdSev.textContent = severityLabel(row.length > 11 ? row[11] : null);
+      tr.appendChild(tdSev);
+
+      const tdFix = document.createElement("td");
+      tdFix.className = "update-td-fix";
+      tdFix.textContent = row.length > 0 && row[row.length - 1] != null
+        ? String(row[row.length - 1]) : "";
+      tr.appendChild(tdFix);
+
+      tbody.appendChild(tr);
+    }
+    reopenTable.appendChild(tbody);
+    reopenSection.hidden = false;
   }
 
   // ── Aging ──────────────────────────────────────────────────────────────────
@@ -1442,9 +2231,14 @@ document.addEventListener("DOMContentLoaded", () => {
     let resolved = 0;
     let openOver30 = 0;
     let throughputLast30 = 0;
+    let ticketsOnOte = 0;
+    let ticketsOnShso = 0;
 
     for (const row of rows) {
       const statusRaw = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+
+      if (statusRaw === "TODO" || statusRaw === "INPROG") ticketsOnOte++;
+      if (statusRaw === "TESTING" || statusRaw === "WAIT-INFO") ticketsOnShso++;
 
       if (RESOLVED.has(statusRaw)) {
         resolved++;
@@ -1475,6 +2269,8 @@ document.addEventListener("DOMContentLoaded", () => {
       resolutionRate: rows.length > 0 ? (resolved / rows.length) * 100 : 0,
       openOver30,
       throughputLast30,
+      ticketsOnOte,
+      ticketsOnShso,
       typeEntries,
     };
   }
@@ -1672,6 +2468,30 @@ document.addEventListener("DOMContentLoaded", () => {
       "Resolved",
       row => RESOLVED.has((row[2] != null ? String(row[2]).trim().toUpperCase() : "")),
       true  // show days column
+    )));
+
+    // 2b. Tickets on OTE (TODO + INPROG)
+    const OTE_STATUSES = new Set(["TODO", "INPROG"]);
+    tiles.push(strip.appendChild(tile(
+      kpis.ticketsOnOte,
+      "Tickets on OTE",
+      "TODO + INPROG",
+      "kpi-accent-blue",
+      "Tickets on OTE",
+      row => OTE_STATUSES.has((row[2] != null ? String(row[2]).trim().toUpperCase() : "")),
+      false
+    )));
+
+    // 2c. On SHSO (TESTING + WAIT-INFO)
+    const SHSO_STATUSES = new Set(["TESTING", "WAIT-INFO"]);
+    tiles.push(strip.appendChild(tile(
+      kpis.ticketsOnShso,
+      "On SHSO",
+      "TESTING + WAIT-INFO",
+      "kpi-accent-purple",
+      "On SHSO",
+      row => SHSO_STATUSES.has((row[2] != null ? String(row[2]).trim().toUpperCase() : "")),
+      false
     )));
 
     // 3. Resolution rate (same filter as Resolved)
