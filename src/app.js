@@ -245,12 +245,13 @@ document.addEventListener("DOMContentLoaded", () => {
       bcKpiCurrent.appendChild(renderKpiStrip(currentKpis, filteredCurrent));
       bcCurrentFileTag.textContent = `— ${sharedFileName}`;
 
-      // Current Tickets Responsibility pie
+      // Current Tickets Responsibility pie (exclude resolved)
+      const currentUnresolved = filteredCurrent.filter(r => { const s = r[2] != null ? String(r[2]).trim().toUpperCase() : ""; return s !== "DONE" && s !== "CLOSED"; });
       bcRespContent.innerHTML = "";
       bcRespContent.appendChild(pieBlock(
         "Current Tickets Responsibility",
-        groupedTally(filteredCurrent, respGroupLabel),
-        filteredCurrent,
+        groupedTally(currentUnresolved, respGroupLabel),
+        currentUnresolved,
         respGroupLabel,
         lbl => RESP_GROUP_COLORS[lbl] ?? COLORS[0]
       ));
@@ -264,12 +265,13 @@ document.addEventListener("DOMContentLoaded", () => {
       bcKpiBaseline.appendChild(renderKpiStrip(baselineKpis, filteredBaseline));
       bcBaselineFileTag.textContent = `— ${bcFileName}`;
 
-      // Baseline Tickets Responsibility pie
+      // Baseline Tickets Responsibility pie (exclude resolved)
+      const baselineUnresolved = filteredBaseline.filter(r => { const s = r[2] != null ? String(r[2]).trim().toUpperCase() : ""; return s !== "DONE" && s !== "CLOSED"; });
       bcBaseRespContent.innerHTML = "";
       bcBaseRespContent.appendChild(pieBlock(
         "Baseline Tickets Responsibility",
-        groupedTally(filteredBaseline, respGroupLabel),
-        filteredBaseline,
+        groupedTally(baselineUnresolved, respGroupLabel),
+        baselineUnresolved,
         respGroupLabel,
         lbl => RESP_GROUP_COLORS[lbl] ?? COLORS[0]
       ));
@@ -2624,7 +2626,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const col16El = document.getElementById("col16Section");
     // Status pie uses STATUS_COLORS by label name; responsibility pie uses positional COLORS
     dashGrid.insertBefore(pieBlock("Ticket Status Breakdown", tally(rows, 2), rows, statusLabelFn, lbl => statusColor(lbl)), col16El);
-    dashGrid.insertBefore(pieBlock("Responsibility Breakdown", groupedTally(rows, respGroupLabel), rows, respGroupLabel, lbl => RESP_GROUP_COLORS[lbl] ?? COLORS[0]), col16El);
+    const statsUnresolved = rows.filter(r => { const s = r[2] != null ? String(r[2]).trim().toUpperCase() : ""; return s !== "DONE" && s !== "CLOSED"; });
+    dashGrid.insertBefore(pieBlock("Responsibility Breakdown", groupedTally(statsUnresolved, respGroupLabel), statsUnresolved, respGroupLabel, lbl => RESP_GROUP_COLORS[lbl] ?? COLORS[0]), col16El);
     dashGrid.hidden = false;
   }
 
