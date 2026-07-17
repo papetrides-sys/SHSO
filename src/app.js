@@ -2981,6 +2981,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ── Create Presentation ────────────────────────────────────────────────────
 
+  // ── Export Backlog of OTE ──────────────────────────────────────────────────
+  document.getElementById("exportOteBtn").addEventListener("click", () => {
+    const OTE_STATUSES = new Set(["TODO", "INPROG"]);
+    const oteRows = sharedRows.filter(row => {
+      const s = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      return OTE_STATUSES.has(s);
+    });
+
+    // Prepend header row if the file had one
+    const exportRows = (homeHeaderChk.checked && rawRows.length) ? [rawRows[0], ...oteRows] : oteRows;
+
+    const ws = XLSX.utils.aoa_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "OTE Backlog");
+
+    const baseName = sharedFileName.replace(/\.xlsx$/i, "");
+    XLSX.writeFile(wb, `${baseName}_OTE_Backlog.xlsx`);
+  });
+
+  // ── Export SHSO Pending ────────────────────────────────────────────────────
+  document.getElementById("exportShsoBtn").addEventListener("click", () => {
+    const SHSO_STATUSES = new Set(["TESTING", "WAIT-INFO"]);
+    const shsoRows = sharedRows.filter(row => {
+      const s = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      return SHSO_STATUSES.has(s);
+    });
+
+    // Prepend header row if the file had one
+    const exportRows = (homeHeaderChk.checked && rawRows.length) ? [rawRows[0], ...shsoRows] : shsoRows;
+
+    const ws = XLSX.utils.aoa_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "SHSO Pending");
+
+    const baseName = sharedFileName.replace(/\.xlsx$/i, "");
+    XLSX.writeFile(wb, `${baseName}_SHSO_Pending.xlsx`);
+  });
+
   const createPptxBtn = document.getElementById("createPptxBtn");
 
   const PPTX_BTN_HTML =
