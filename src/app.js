@@ -2348,12 +2348,17 @@ document.addEventListener("DOMContentLoaded", () => {
     let throughputLast30 = 0;
     let ticketsOnOte = 0;
     let ticketsOnShso = 0;
+    let shsoOver30 = 0;
 
     for (const row of rows) {
       const statusRaw = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
 
       if (statusRaw === "TODO" || statusRaw === "INPROG") ticketsOnOte++;
-      if (statusRaw === "TESTING" || statusRaw === "WAIT-INFO") ticketsOnShso++;
+      if (statusRaw === "TESTING" || statusRaw === "WAIT-INFO") {
+        ticketsOnShso++;
+        const statusDate = parseDate(row[3]);
+        if (statusDate && (now - statusDate.getTime()) > 30 * MS_DAY) shsoOver30++;
+      }
 
       if (RESOLVED.has(statusRaw)) {
         resolved++;
@@ -2386,6 +2391,7 @@ document.addEventListener("DOMContentLoaded", () => {
       throughputLast30,
       ticketsOnOte,
       ticketsOnShso,
+      shsoOver30,
       typeEntries,
     };
   }
@@ -2634,6 +2640,23 @@ document.addEventListener("DOMContentLoaded", () => {
         return statusDate && statusDate.getTime() >= thirtyDaysAgo;
       },
       true
+    )));
+
+    // 5. SHSO > 30 days (TESTING + WAIT-INFO with status date older than 30 days)
+    const SHSO_OVER30_STATUSES = new Set(["TESTING", "WAIT-INFO"]);
+    tiles.push(strip.appendChild(tile(
+      kpis.shsoOver30,
+      "SHSO > 30 Days",
+      "by status date",
+      kpis.shsoOver30 > 0 ? "kpi-accent-red" : "kpi-accent-green",
+      "SHSO > 30 Days",
+      row => {
+        const statusRaw = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+        if (!SHSO_OVER30_STATUSES.has(statusRaw)) return false;
+        const statusDate = parseDate(row[3]);
+        return statusDate && (now - statusDate.getTime()) > 30 * MS_DAY;
+      },
+      false
     )));
 
     // 6. Open > 30 days
