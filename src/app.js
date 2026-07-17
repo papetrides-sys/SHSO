@@ -118,6 +118,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const bcReturnedSection  = document.getElementById("bcReturnedSection");
   const bcReturnedCount    = document.getElementById("bcReturnedCount");
   const bcReturnedTable    = document.getElementById("bcReturnedTable");
+  const bcResolvedSection  = document.getElementById("bcResolvedSection");
+  const bcResolvedCount    = document.getElementById("bcResolvedCount");
+  const bcResolvedTable    = document.getElementById("bcResolvedTable");
   const bcRespSection      = document.getElementById("bcRespSection");
   const bcRespContent      = document.getElementById("bcRespContent");
   const bcRespFileTag      = document.getElementById("bcRespFileTag");
@@ -226,6 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bcProgressSection.hidden  = !hasBoth;
     bcDeliveredSection.hidden = !hasBoth;
     bcReturnedSection.hidden  = !hasBoth;
+    bcResolvedSection.hidden  = !hasBoth;
     bcRespSection.style.display  = (hasCurrentFile || hasBaselineFile) ? "" : "none";
     bcRespSection.hidden         = false;
     bcBaseRespSection.hidden     = !hasBaselineFile;
@@ -281,6 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderBcProgress(currentKpis, baselineKpis, currentTesting, baselineTesting);
       renderBcDelivered(filteredCurrent, filteredBaseline);
       renderBcReturned(filteredCurrent, filteredBaseline);
+      renderBcResolved(filteredCurrent, filteredBaseline);
     }
   }
 
@@ -607,6 +612,104 @@ document.addEventListener("DOMContentLoaded", () => {
     bcReturnedTable.appendChild(tbody);
   }
 
+  /**
+   * Render the "Resolved Tickets" section.
+   * Items qualify when:
+   *   - They appear in the baseline with status NOT DONE or CLOSED
+   *   - They appear in the current file (matched by ID, col 0) with status DONE or CLOSED
+   * The table shows: ID, Description, Status, Severity, Fix Version.
+   * Sort order: Fix Version (ascending) then Severity numeric (1 < 2 < 3 < 4).
+   */
+  function renderBcResolved(currentRows, baselineRows) {
+    // Build a set of baseline IDs that were NOT resolved
+    const RESOLVED = new Set(["DONE", "CLOSED"]);
+    const baselineIds = new Set();
+    for (const row of baselineRows) {
+      const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      if (!RESOLVED.has(st) && row[0] != null) {
+        baselineIds.add(String(row[0]).trim());
+      }
+    }
+
+    // Find current rows whose ID was unresolved in baseline and are now DONE or CLOSED
+    const SEV_ORDER = { "1": 1, "2": 2, "3": 3, "4": 4 };
+
+    let resolved = currentRows.filter(row => {
+      const id = row[0] != null ? String(row[0]).trim() : "";
+      const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+      return id !== "" && baselineIds.has(id) && RESOLVED.has(st);
+    });
+
+    // Sort: Fix Version asc (last col), then severity numeric asc
+    resolved.sort((a, b) => {
+      const fa = a.length > 0 && a[a.length - 1] != null ? String(a[a.length - 1]) : "";
+      const fb = b.length > 0 && b[b.length - 1] != null ? String(b[b.length - 1]) : "";
+      const fCmp = fa.localeCompare(fb, undefined, { numeric: true, sensitivity: "base" });
+      if (fCmp !== 0) return fCmp;
+      const sa = SEV_ORDER[String(a.length > 11 && a[11] != null ? a[11] : "").trim()] ?? 99;
+      const sb = SEV_ORDER[String(b.length > 11 && b[11] != null ? b[11] : "").trim()] ?? 99;
+      return sa - sb;
+    });
+
+    // Count line
+    bcResolvedCount.textContent = resolved.length === 0
+      ? "No items resolved since baseline."
+      : `${resolved.length} item${resolved.length === 1 ? "" : "s"} resolved since baseline`;
+
+    // Build table
+    if (resolved.length === 0) {
+      bcResolvedTable.innerHTML = "";
+      return;
+    }
+
+    bcResolvedTable.innerHTML =
+      `<thead><tr>
+        <th>ID</th>
+        <th>Description</th>
+        <th>Status</th>
+        <th>Severity</th>
+        <th>Fix Version</th>
+      </tr></thead>`;
+
+    const tbody = document.createElement("tbody");
+    for (const row of resolved) {
+      const tr = document.createElement("tr");
+
+      // ID — col 0
+      const tdId = document.createElement("td");
+      tdId.textContent = row[0] != null ? String(row[0]) : "";
+      tr.appendChild(tdId);
+
+      // Description — col 1
+      const tdDesc = document.createElement("td");
+      tdDesc.className = "bc-dft-td-desc";
+      tdDesc.textContent = row[1] != null ? String(row[1]) : "";
+      tr.appendChild(tdDesc);
+
+      // Status — col 2
+      const tdStatus = document.createElement("td");
+      tdStatus.className = "bc-dft-td-status";
+      tdStatus.textContent = row[2] != null ? String(row[2]).trim() : "";
+      tr.appendChild(tdStatus);
+
+      // Severity — col 11
+      const tdSev = document.createElement("td");
+      tdSev.className = "bc-dft-td-sev";
+      tdSev.textContent = severityLabel(row.length > 11 ? row[11] : null);
+      tr.appendChild(tdSev);
+
+      // Fix Version — last column
+      const tdFix = document.createElement("td");
+      tdFix.className = "bc-dft-td-fix";
+      tdFix.textContent = row.length > 0 && row[row.length - 1] != null
+        ? String(row[row.length - 1]) : "";
+      tr.appendChild(tdFix);
+
+      tbody.appendChild(tr);
+    }
+    bcResolvedTable.appendChild(tbody);
+  }
+
   function parseBcFile(file) {
     bcErrorBox.hidden = true; bcErrorBox.textContent = "";
     bcReadyMsg.hidden = true;
@@ -696,6 +799,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("backFromStats").addEventListener("click",    () => showView("viewHome"));
   document.getElementById("backFromUpdate").addEventListener("click",   () => showView("viewHome"));
   document.getElementById("backFromBaseline").addEventListener("click", () => showView("viewHome"));
+
+  // ── Collapsible BC sections ─────────────────────────────────────────────────
+  document.querySelectorAll(".bc-section-header").forEach(header => {
+    header.addEventListener("click", () => {
+      const section = header.closest(".bc-kpi-section");
+      if (section) section.classList.toggle("bc-collapsed");
+    });
+  });
 
   // ── Update Tickets ─────────────────────────────────────────────────────────
   const updateDateControls = document.getElementById("updateDateControls");

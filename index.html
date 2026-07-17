@@ -1063,6 +1063,30 @@
       .bc-sidebar.collapsed { display: none; }
       .bc-main { padding: 1rem; }
     }
+
+    /* ── Collapsible section header ────────────────────────────────────────── */
+    .bc-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 0.85rem;
+    }
+    .bc-section-header .bc-section-label { margin-bottom: 0; }
+    .bc-collapse-btn {
+      background: none;
+      border: none;
+      padding: 0 0.2rem;
+      cursor: pointer;
+      color: #57606a;
+      font-size: 0.8rem;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .bc-kpi-section.bc-collapsed .bc-collapse-btn { transform: rotate(-90deg); }
+    .bc-kpi-section.bc-collapsed .bc-section-body { display: none; }
   </style>
 </head>
 <body>
@@ -1266,20 +1290,44 @@
 
         <!-- Delivered for Testing -->
         <div class="bc-kpi-section" id="bcDeliveredSection" hidden>
-          <p class="bc-section-label bc-section-label--purple">Delivered for Testing
-            <span class="bc-file-tag">Baseline: TODO / INPROG → Current: TESTING / WAIT-INFO</span>
-          </p>
-          <div id="bcDeliveredCount" style="font-size:0.82rem;color:#57606a;margin-bottom:0.6rem"></div>
-          <table id="bcDeliveredTable" class="bc-dft-table"></table>
+          <div class="bc-section-header" data-collapse="bcDeliveredSection">
+            <p class="bc-section-label bc-section-label--purple">Delivered for Testing
+              <span class="bc-file-tag">Baseline: TODO / INPROG → Current: TESTING / WAIT-INFO</span>
+            </p>
+            <button class="bc-collapse-btn" aria-label="Toggle section">&#9660;</button>
+          </div>
+          <div class="bc-section-body">
+            <div id="bcDeliveredCount" style="font-size:0.82rem;color:#57606a;margin-bottom:0.6rem"></div>
+            <table id="bcDeliveredTable" class="bc-dft-table"></table>
+          </div>
         </div>
 
         <!-- Returned Tickets -->
         <div class="bc-kpi-section" id="bcReturnedSection" hidden>
-          <p class="bc-section-label bc-section-label--amber">Returned Tickets
-            <span class="bc-file-tag">Baseline: TESTING / WAIT-INFO → Current: TODO / INPROG</span>
-          </p>
-          <div id="bcReturnedCount" style="font-size:0.82rem;color:#57606a;margin-bottom:0.6rem"></div>
-          <table id="bcReturnedTable" class="bc-dft-table"></table>
+          <div class="bc-section-header" data-collapse="bcReturnedSection">
+            <p class="bc-section-label bc-section-label--amber">Returned Tickets
+              <span class="bc-file-tag">Baseline: TESTING / WAIT-INFO → Current: TODO / INPROG</span>
+            </p>
+            <button class="bc-collapse-btn" aria-label="Toggle section">&#9660;</button>
+          </div>
+          <div class="bc-section-body">
+            <div id="bcReturnedCount" style="font-size:0.82rem;color:#57606a;margin-bottom:0.6rem"></div>
+            <table id="bcReturnedTable" class="bc-dft-table"></table>
+          </div>
+        </div>
+
+        <!-- Resolved Tickets -->
+        <div class="bc-kpi-section" id="bcResolvedSection" hidden>
+          <div class="bc-section-header" data-collapse="bcResolvedSection">
+            <p class="bc-section-label bc-section-label--green">Resolved Tickets
+              <span class="bc-file-tag">Baseline: not DONE/CLOSED → Current: DONE/CLOSED</span>
+            </p>
+            <button class="bc-collapse-btn" aria-label="Toggle section">&#9660;</button>
+          </div>
+          <div class="bc-section-body">
+            <div id="bcResolvedCount" style="font-size:0.82rem;color:#57606a;margin-bottom:0.6rem"></div>
+            <table id="bcResolvedTable" class="bc-dft-table"></table>
+          </div>
         </div>
 
         <p id="bcHint" style="color:#57606a;font-size:0.875rem;padding:1rem 0">
