@@ -387,6 +387,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const card = document.createElement("div");
       card.className = "bc-progress-card";
+      if (badgeClass === "bc-delta--better") card.style.background = "#f0fdf4";
+      else if (badgeClass === "bc-delta--worse") card.style.background = "#fff0f0";
       card.innerHTML =
         `<div class="bc-progress-kpi-label">${def.label}</div>
          <div class="bc-progress-row">
