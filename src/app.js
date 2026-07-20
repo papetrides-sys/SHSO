@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
         sharedFileName = file.name;
@@ -932,6 +932,9 @@ document.addEventListener("DOMContentLoaded", () => {
   /** Parse an Excel date serial or string into a UTC midnight Date, or null */
   function parseDateVal(val) {
     if (val == null) return null;
+    if (val instanceof Date) {
+      return isNaN(val) ? null : new Date(Date.UTC(val.getUTCFullYear(), val.getUTCMonth(), val.getUTCDate()));
+    }
     if (typeof val === "number") {
       const ms = (val - 25569) * 86400000;
       const d  = new Date(ms);
@@ -1361,6 +1364,9 @@ document.addEventListener("DOMContentLoaded", () => {
    *  Accepts JS Date serial numbers (Excel) or ISO / common string formats. */
   function parseDate(val) {
     if (val == null) return null;
+    if (val instanceof Date) {
+      return isNaN(val) ? null : new Date(Date.UTC(val.getUTCFullYear(), val.getUTCMonth(), val.getUTCDate()));
+    }
     // Excel numeric serial date
     if (typeof val === "number") {
       // Excel epoch is 1900-01-01, but has a leap-year bug so offset is 25569 days to Unix epoch
