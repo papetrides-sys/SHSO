@@ -1510,8 +1510,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const configs = [
-      { el: bugsCreationSection, type: "Defect (Bug)",      title: "Bugs Created per Week",          color: "#ef4444" },
-      { el: enhCreationSection,  type: "Enhancement (SR)",  title: "Enhancements Created per Week",   color: "#7c5cd8" },
+      { el: bugsCreationSection, type: "Defect (Bug)",      title: "Bugs Created per Week",          color: "#ef4444", h: 198 },
+      { el: enhCreationSection,  type: "Enhancement (SR)",  title: "Enhancements Created per Week",   color: "#7c5cd8", h: 198 },
       { el: opCreationSection,   type: "Operational",       title: "Operational Created per Week",    color: "#f59e0b" },
     ];
 
@@ -1519,14 +1519,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const series = buildTypeCreationSeries(cfg.type);
       const total  = series.reduce((a, b) => a + b, 0);
       const avg    = total / totalDays;
-      cfg.el.appendChild(buildCreationChart(checkpoints, labels, series, avg, fromDate, toDate, cfg.title, cfg.color));
+      cfg.el.appendChild(buildCreationChart(checkpoints, labels, series, avg, fromDate, toDate, cfg.title, cfg.color, cfg.h));
       cfg.el.hidden = false;
     }
   }
 
   function buildLineChart(checkpoints, labels, todoSeries, inprogSeries, testingSeries, doneSeries) {
     const NS = "http://www.w3.org/2000/svg";
-    const W = 620, H = 240;
+    const W = 620, H = 216;
     const PAD = { top: 16, right: 20, bottom: 52, left: 44 };
     const chartW = W - PAD.left - PAD.right;
     const chartH = H - PAD.top  - PAD.bottom;
@@ -1703,9 +1703,9 @@ document.addEventListener("DOMContentLoaded", () => {
    * @param {Date}     fromDate     — range start
    * @param {Date}     toDate       — range end
    */
-  function buildCreationChart(checkpoints, labels, createdSeries, avgPerDay, fromDate, toDate, title, barColor) {
+  function buildCreationChart(checkpoints, labels, createdSeries, avgPerDay, fromDate, toDate, title, barColor, chartHeight) {
     const NS = "http://www.w3.org/2000/svg";
-    const W = 620, H = 220;
+    const W = 620, H = chartHeight ?? 220;
     const PAD = { top: 20, right: 20, bottom: 52, left: 44 };
     const chartW = W - PAD.left - PAD.right;
     const chartH = H - PAD.top  - PAD.bottom;
