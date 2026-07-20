@@ -978,7 +978,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Ticket Number — col 1 (index 0)
       const tdId = document.createElement("td");
-      tdId.textContent = row[0] != null ? String(row[0]) : "";
+      const ticketNum = row[0] != null ? String(row[0]) : "";
+      if (ticketNum) {
+        const a = document.createElement("a");
+        a.href = `https://opsytest.atlassian.net/issues/?jql=textfields%20~%20%22ICD%23${encodeURIComponent(ticketNum)}%22`;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = ticketNum;
+        tdId.appendChild(a);
+      } else {
+        tdId.textContent = "";
+      }
       tr.appendChild(tdId);
 
       // Summary — col 2 (index 1)
