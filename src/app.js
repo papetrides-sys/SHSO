@@ -1516,8 +1516,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const configs = [
-      { el: bugsCreationSection, type: "Defect (Bug)",      title: "Bugs Created per Week",          color: "#ef4444", h: 198 },
-      { el: enhCreationSection,  type: "Enhancement (SR)",  title: "Enhancements Created per Week",   color: "#7c5cd8", h: 198 },
+      { el: bugsCreationSection, type: "Defect (Bug)",      title: "Bugs Created per Week",          color: "#ef4444" },
+      { el: enhCreationSection,  type: "Enhancement (SR)",  title: "Enhancements Created per Week",   color: "#7c5cd8" },
       { el: opCreationSection,   type: "Operational",       title: "Operational Created per Week",    color: "#f59e0b" },
     ];
 
@@ -1525,14 +1525,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const series = buildTypeCreationSeries(cfg.type);
       const total  = series.reduce((a, b) => a + b, 0);
       const avg    = total / totalDays;
-      cfg.el.appendChild(buildCreationChart(checkpoints, labels, series, avg, fromDate, toDate, cfg.title, cfg.color, cfg.h));
+      cfg.el.appendChild(buildCreationChart(checkpoints, labels, series, avg, fromDate, toDate, cfg.title, cfg.color));
       cfg.el.hidden = false;
     }
   }
 
   function buildLineChart(checkpoints, labels, todoSeries, inprogSeries, testingSeries, doneSeries) {
     const NS = "http://www.w3.org/2000/svg";
-    const W = 620, H = 216;
+    const W = 620, H = 240;
     const PAD = { top: 16, right: 20, bottom: 52, left: 44 };
     const chartW = W - PAD.left - PAD.right;
     const chartH = H - PAD.top  - PAD.bottom;
@@ -1649,9 +1649,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Mouse move on the SVG overlay
     overlay.addEventListener("mousemove", e => {
-      const rect = svg.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left - PAD.left;
-      const frac   = Math.max(0, Math.min(1, mouseX / chartW));
+      const rect  = svg.getBoundingClientRect();
+      const scale = rect.width / W;   // viewBox → rendered pixel ratio
+      const mouseX = e.clientX - rect.left - PAD.left * scale;
+      const frac   = Math.max(0, Math.min(1, mouseX / (chartW * scale)));
       const idx    = Math.round(frac * (n - 1));
 
       const cx = xOf(idx);
@@ -1666,12 +1667,13 @@ document.addEventListener("DOMContentLoaded", () => {
         `<span style="color:#7c5cd8">■</span> Testing: ${testingSeries[idx]}<br>` +
         `<span style="color:#22c55e">■</span> DONE: ${doneSeries[idx]}`;
 
-      // Position tooltip: prefer right of cursor, flip left near the edge
+      // Position tooltip in screen pixels relative to wrap
       const svgLeft  = rect.left - wrap.getBoundingClientRect().left;
-      const tipX     = svgLeft + cx + 10;
-      const tipRight = tipX + 140; // estimated tooltip width
-      tooltip.style.left = (tipRight > wrap.offsetWidth ? svgLeft + cx - 145 : tipX) + "px";
-      tooltip.style.top  = (PAD.top + 8) + "px";
+      const cxPx     = svgLeft + cx * scale;
+      const tipX     = cxPx + 10;
+      const tipRight = tipX + 140;
+      tooltip.style.left = (tipRight > wrap.offsetWidth ? cxPx - 145 : tipX) + "px";
+      tooltip.style.top  = (PAD.top * scale + 8) + "px";
       tooltip.style.display = "block";
     });
 
@@ -1709,9 +1711,9 @@ document.addEventListener("DOMContentLoaded", () => {
    * @param {Date}     fromDate     — range start
    * @param {Date}     toDate       — range end
    */
-  function buildCreationChart(checkpoints, labels, createdSeries, avgPerDay, fromDate, toDate, title, barColor, chartHeight) {
+  function buildCreationChart(checkpoints, labels, createdSeries, avgPerDay, fromDate, toDate, title, barColor) {
     const NS = "http://www.w3.org/2000/svg";
-    const W = 620, H = chartHeight ?? 220;
+    const W = 620, H = 220;
     const PAD = { top: 20, right: 20, bottom: 52, left: 44 };
     const chartW = W - PAD.left - PAD.right;
     const chartH = H - PAD.top  - PAD.bottom;
@@ -1865,8 +1867,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     overlay.addEventListener("mousemove", e => {
       const rect2 = svg.getBoundingClientRect();
-      const mouseX = e.clientX - rect2.left - PAD.left;
-      const frac   = Math.max(0, Math.min(1, mouseX / chartW));
+      const scale  = rect2.width / W;  // viewBox → rendered pixel ratio
+      const mouseX = e.clientX - rect2.left - PAD.left * scale;
+      const frac   = Math.max(0, Math.min(1, mouseX / (chartW * scale)));
       const idx    = Math.round(frac * (n - 1));
 
       const cx = xOf(idx);
@@ -1878,11 +1881,13 @@ document.addEventListener("DOMContentLoaded", () => {
         `<strong>${labels[idx]}</strong><br>` +
         `<span style="color:${BAR_COLOR}">■</span> Created: ${createdSeries[idx]}`;
 
+      // Position tooltip in screen pixels relative to wrap
       const svgLeft = rect2.left - wrap.getBoundingClientRect().left;
-      const tipX    = svgLeft + cx + 10;
+      const cxPx    = svgLeft + cx * scale;
+      const tipX    = cxPx + 10;
       const tipRight = tipX + 130;
-      tooltip.style.left = (tipRight > wrap.offsetWidth ? svgLeft + cx - 135 : tipX) + "px";
-      tooltip.style.top  = (PAD.top + 8) + "px";
+      tooltip.style.left = (tipRight > wrap.offsetWidth ? cxPx - 135 : tipX) + "px";
+      tooltip.style.top  = (PAD.top * scale + 8) + "px";
       tooltip.style.display = "block";
     });
 
