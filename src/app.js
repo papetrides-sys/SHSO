@@ -1030,9 +1030,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const dashKpiRow     = document.getElementById("dashKpiRow");
   const dashGrid       = document.getElementById("dashGrid");
   const dashFull       = document.getElementById("dashFull");
-  const reopenSection  = document.getElementById("reopenSection");
-  const reopenCount    = document.getElementById("reopenCount");
-  const reopenTable    = document.getElementById("reopenTable");
 
   // ── Sidebar collapse toggle ────────────────────────────────────────────────
   const dashSidebar       = document.getElementById("dashSidebar");
@@ -1085,7 +1082,6 @@ document.addEventListener("DOMContentLoaded", () => {
     chartsArea.hidden = true;   chartsArea.innerHTML = "";
     dashKpiRow.innerHTML = ""; dashKpiRow.hidden = true;
     dashFull.hidden = true;
-    reopenSection.hidden = true; reopenTable.innerHTML = "";
     [bugsCreationSection, enhCreationSection, opCreationSection].forEach(s => {
       s.hidden = true; s.innerHTML = "";
     });
@@ -1272,76 +1268,8 @@ document.addEventListener("DOMContentLoaded", () => {
     dashKpiRow.innerHTML = "";
     renderCharts(filteredRows());
     buildCol16Section(filteredRows());
-    buildReopenSection();
     // keep aging chart in sync when filters change
     refreshAging();
-  }
-
-  function buildReopenSection() {
-    reopenTable.innerHTML = "";
-    reopenSection.hidden = true;
-
-    // Today at UTC midnight — independent of sidebar filters
-    const now = new Date();
-    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-
-    const rows = allRows.filter(row => {
-      const status = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
-      if (status !== "TODO") return false;
-      const statusDate  = parseDateVal(row[3]);
-      const createdDate = parseDateVal(row[10]);
-      return statusDate  !== null && statusDate  >= today &&
-             createdDate !== null && createdDate <  today;
-    });
-
-    reopenCount.textContent = rows.length === 0
-      ? "No reopen items found."
-      : `${rows.length} item${rows.length === 1 ? "" : "s"}`;
-
-    if (rows.length === 0) { reopenSection.hidden = false; return; }
-
-    reopenTable.innerHTML =
-      `<thead><tr>
-        <th>Ticket Number</th>
-        <th>Summary</th>
-        <th>Status Date</th>
-        <th>Severity</th>
-        <th>Fix Version</th>
-      </tr></thead>`;
-
-    const tbody = document.createElement("tbody");
-    for (const row of rows) {
-      const tr = document.createElement("tr");
-
-      const tdId = document.createElement("td");
-      tdId.textContent = row[0] != null ? String(row[0]) : "";
-      tr.appendChild(tdId);
-
-      const tdSum = document.createElement("td");
-      tdSum.className = "update-td-summary";
-      tdSum.textContent = row[1] != null ? String(row[1]) : "";
-      tr.appendChild(tdSum);
-
-      const tdDate = document.createElement("td");
-      tdDate.className = "update-td-date";
-      tdDate.textContent = fmtDateCell(row[3]);
-      tr.appendChild(tdDate);
-
-      const tdSev = document.createElement("td");
-      tdSev.className = "update-td-sev";
-      tdSev.textContent = severityLabel(row.length > 11 ? row[11] : null);
-      tr.appendChild(tdSev);
-
-      const tdFix = document.createElement("td");
-      tdFix.className = "update-td-fix";
-      tdFix.textContent = row.length > 0 && row[row.length - 1] != null
-        ? String(row[row.length - 1]) : "";
-      tr.appendChild(tdFix);
-
-      tbody.appendChild(tr);
-    }
-    reopenTable.appendChild(tbody);
-    reopenSection.hidden = false;
   }
 
   // ── Aging ──────────────────────────────────────────────────────────────────
@@ -1350,10 +1278,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const agingTo         = document.getElementById("agingTo");
   const agingFetch      = document.getElementById("agingFetch");
   const agingError      = document.getElementById("agingError");
-  const agingChartWrap      = document.getElementById("agingChartWrap");
-  const bugsCreationSection = document.getElementById("bugsCreationSection");
-  const enhCreationSection  = document.getElementById("enhCreationSection");
-  const opCreationSection   = document.getElementById("opCreationSection");
+  const agingChartWrap          = document.getElementById("agingChartWrap");
+  const bugsCreationSection     = document.getElementById("bugsCreationSection");
+  const enhCreationSection      = document.getElementById("enhCreationSection");
+  const opCreationSection       = document.getElementById("opCreationSection");
+  const createdVsResolvedSection = document.getElementById("createdVsResolvedSection");
 
   /** Show the aging section, pre-fill default dates, and auto-fetch */
   function showAgingSection() {
@@ -1404,7 +1333,7 @@ document.addEventListener("DOMContentLoaded", () => {
     agingError.hidden = true;
     agingChartWrap.hidden = true;
     agingChartWrap.innerHTML = "";
-    [bugsCreationSection, enhCreationSection, opCreationSection].forEach(s => {
+    [createdVsResolvedSection, bugsCreationSection, enhCreationSection, opCreationSection].forEach(s => {
       s.hidden = true; s.innerHTML = "";
     });
 
@@ -1504,6 +1433,32 @@ document.addEventListener("DOMContentLoaded", () => {
       doneSeries.push(done);
     }
 
+    // ── Created vs Resolved per Week (cumulative) ────────────────────────────
+    const RESOLVED_SET = new Set(["DONE", "CLOSED"]);
+    const cvrRows = filteredRows();
+    const createdSeries  = checkpoints.map(cp => {
+      let count = 0;
+      for (const row of cvrRows) {
+        const d = parseDate(row[10]);
+        if (d && d >= fromDate && d <= cp) count++;
+      }
+      return count;
+    });
+    const resolvedSeries = checkpoints.map(cp => {
+      let count = 0;
+      for (const row of cvrRows) {
+        const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+        if (!RESOLVED_SET.has(st)) continue;
+        const d = parseDate(row[3]);
+        if (d && d >= fromDate && d <= cp) count++;
+      }
+      return count;
+    });
+    createdVsResolvedSection.appendChild(
+      buildCreatedVsResolvedChart(checkpoints, labels, createdSeries, resolvedSeries)
+    );
+    createdVsResolvedSection.hidden = false;
+
     agingChartWrap.appendChild(buildLineChart(checkpoints, labels, todoSeries, inprogSeries, testingSeries, doneSeries));
     agingChartWrap.hidden = false;
 
@@ -1539,6 +1494,205 @@ document.addEventListener("DOMContentLoaded", () => {
       cfg.el.hidden = false;
     }
   }
+
+
+  /**
+   * Build a two-line chart showing tickets Created per Week vs Resolved per Week.
+   * Created  = reported/created date (col 11, index 10) falls within the week.
+   * Resolved = status date (col 4, index 3) falls within the week AND status is DONE/CLOSED.
+   */
+  function buildCreatedVsResolvedChart(checkpoints, labels, createdSeries, resolvedSeries) {
+    const NS = "http://www.w3.org/2000/svg";
+    const W = 620, H = 240;
+    const PAD = { top: 16, right: 20, bottom: 52, left: 44 };
+    const chartW = W - PAD.left - PAD.right;
+    const chartH = H - PAD.top  - PAD.bottom;
+    const n = checkpoints.length;
+
+    const CREATED_COLOR  = "#3b82d4"; // blue
+    const RESOLVED_COLOR = "#22c55e"; // green
+
+    const allVals = [...createdSeries, ...resolvedSeries];
+    const maxVal  = Math.max(...allVals, 1);
+
+    const xOf = i => PAD.left + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
+    const yOf = v => PAD.top  + chartH - (v / maxVal) * chartH;
+
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("width", "100%");
+    svg.removeAttribute("height");
+    svg.classList.add("aging-svg");
+
+    // Grid lines + Y-axis labels
+    const steps = 5;
+    for (let s = 0; s <= steps; s++) {
+      const v = Math.round((maxVal / steps) * s);
+      const y = yOf(v);
+      const gl = document.createElementNS(NS, "line");
+      gl.setAttribute("x1", PAD.left); gl.setAttribute("x2", PAD.left + chartW);
+      gl.setAttribute("y1", y);        gl.setAttribute("y2", y);
+      gl.classList.add("aging-grid-line");
+      svg.appendChild(gl);
+      const lbl = document.createElementNS(NS, "text");
+      lbl.setAttribute("x", PAD.left - 4);
+      lbl.setAttribute("y", y + 3);
+      lbl.setAttribute("text-anchor", "end");
+      lbl.classList.add("aging-axis-label");
+      lbl.textContent = v;
+      svg.appendChild(lbl);
+    }
+
+    // X-axis base line
+    const xAxis = document.createElementNS(NS, "line");
+    xAxis.setAttribute("x1", PAD.left); xAxis.setAttribute("x2", PAD.left + chartW);
+    xAxis.setAttribute("y1", PAD.top + chartH); xAxis.setAttribute("y2", PAD.top + chartH);
+    xAxis.classList.add("aging-axis-line");
+    svg.appendChild(xAxis);
+
+    // X-axis labels
+    const labelStep = Math.ceil(n / 12);
+    checkpoints.forEach((cp, i) => {
+      if (i % labelStep !== 0 && i !== n - 1) return;
+      const x = xOf(i);
+      const lbl = document.createElementNS(NS, "text");
+      lbl.setAttribute("x", x);
+      lbl.setAttribute("y", PAD.top + chartH + 14);
+      lbl.setAttribute("text-anchor", "middle");
+      lbl.classList.add("aging-axis-label");
+      lbl.textContent = labels[i] ?? "";
+      if (n > 8) lbl.setAttribute("transform", `rotate(-35, ${x}, ${PAD.top + chartH + 14})`);
+      svg.appendChild(lbl);
+    });
+
+    // Draw a polyline + dots for one series
+    function drawSeries(series, color, dotClass) {
+      if (n === 0) return;
+      const points = series.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(" ");
+      const poly = document.createElementNS(NS, "polyline");
+      poly.setAttribute("points", points);
+      poly.setAttribute("fill", "none");
+      poly.setAttribute("stroke", color);
+      poly.setAttribute("stroke-width", "2");
+      svg.appendChild(poly);
+      series.forEach((v, i) => {
+        const dot = document.createElementNS(NS, "circle");
+        dot.setAttribute("cx", xOf(i));
+        dot.setAttribute("cy", yOf(v));
+        dot.setAttribute("r", 3);
+        dot.setAttribute("fill", color);
+        svg.appendChild(dot);
+      });
+    }
+
+    drawSeries(createdSeries,  CREATED_COLOR,  "aging-dot-todo");
+    drawSeries(resolvedSeries, RESOLVED_COLOR, "aging-dot-done");
+
+    // Transparent overlay for hover
+    const overlay = document.createElementNS(NS, "rect");
+    overlay.setAttribute("x", PAD.left);
+    overlay.setAttribute("y", PAD.top);
+    overlay.setAttribute("width",  chartW);
+    overlay.setAttribute("height", chartH);
+    overlay.setAttribute("fill", "transparent");
+    svg.appendChild(overlay);
+
+    const crosshair = document.createElementNS(NS, "line");
+    crosshair.setAttribute("y1", PAD.top);
+    crosshair.setAttribute("y2", PAD.top + chartH);
+    crosshair.setAttribute("stroke", "#c0c8d0");
+    crosshair.setAttribute("stroke-width", "1");
+    crosshair.setAttribute("stroke-dasharray", "3 2");
+    crosshair.setAttribute("display", "none");
+    svg.appendChild(crosshair);
+
+    const wrap = document.createElement("div");
+    wrap.style.position = "relative";
+    wrap.appendChild(svg);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "aging-tooltip";
+    wrap.appendChild(tooltip);
+
+    overlay.addEventListener("mousemove", e => {
+      const rect  = svg.getBoundingClientRect();
+      const scale = rect.width / W;
+      const mouseX = e.clientX - rect.left - PAD.left * scale;
+      const frac   = Math.max(0, Math.min(1, mouseX / (chartW * scale)));
+      const idx    = Math.round(frac * (n - 1));
+
+      const cx = xOf(idx);
+      crosshair.setAttribute("x1", cx);
+      crosshair.setAttribute("x2", cx);
+      crosshair.setAttribute("display", "");
+
+      tooltip.innerHTML =
+        `<strong>${labels[idx]}</strong><br>` +
+        `<span style="color:${CREATED_COLOR}">■</span> Created: ${createdSeries[idx]}<br>` +
+        `<span style="color:${RESOLVED_COLOR}">■</span> Resolved: ${resolvedSeries[idx]}`;
+
+      const svgLeft = rect.left - wrap.getBoundingClientRect().left;
+      const cxPx    = svgLeft + cx * scale;
+      const tipX    = cxPx + 10;
+      const tipRight = tipX + 140;
+      tooltip.style.left = (tipRight > wrap.offsetWidth ? cxPx - 145 : tipX) + "px";
+      tooltip.style.top  = (PAD.top * scale + 8) + "px";
+      tooltip.style.display = "block";
+    });
+
+    overlay.addEventListener("mouseleave", () => {
+      crosshair.setAttribute("display", "none");
+      tooltip.style.display = "none";
+    });
+
+    // Legend
+    const legend = document.createElement("div");
+    legend.className = "aging-legend";
+    legend.innerHTML =
+      `<div class="aging-legend-item">
+         <span class="aging-legend-swatch" style="background:${CREATED_COLOR}"></span> Created this week
+       </div>
+       <div class="aging-legend-item">
+         <span class="aging-legend-swatch" style="background:${RESOLVED_COLOR}"></span> Resolved this week
+       </div>`;
+    wrap.appendChild(legend);
+
+    // Stat bar — series are cumulative so the last value is the total
+    const totalCreated  = n > 0 ? createdSeries[n - 1]  : 0;
+    const totalResolved = n > 0 ? resolvedSeries[n - 1] : 0;
+    const avgCreated    = n > 0 ? (totalCreated  / n).toFixed(1) : "—";
+    const avgResolved   = n > 0 ? (totalResolved / n).toFixed(1) : "—";
+    const statBar = document.createElement("div");
+    statBar.className = "creation-stat-bar";
+    statBar.innerHTML =
+      `<div class="creation-stat-item">
+         <span class="creation-stat-value" style="color:${CREATED_COLOR}">${totalCreated}</span>
+         <span class="creation-stat-label">Total Created</span>
+       </div>
+       <div class="creation-stat-item">
+         <span class="creation-stat-value" style="color:${CREATED_COLOR}">${avgCreated}/wk</span>
+         <span class="creation-stat-label">Avg Created</span>
+       </div>
+       <div class="creation-stat-item">
+         <span class="creation-stat-value" style="color:${RESOLVED_COLOR}">${totalResolved}</span>
+         <span class="creation-stat-label">Total Resolved</span>
+       </div>
+       <div class="creation-stat-item">
+         <span class="creation-stat-value" style="color:${RESOLVED_COLOR}">${avgResolved}/wk</span>
+         <span class="creation-stat-label">Avg Resolved</span>
+       </div>`;
+
+    const titleEl = document.createElement("p");
+    titleEl.className = "dash-panel-title";
+    titleEl.textContent = "Created vs Resolved per Week";
+
+    const section = document.createElement("div");
+    section.appendChild(titleEl);
+    section.appendChild(statBar);
+    section.appendChild(wrap);
+    return section;
+  }
+
 
   function buildLineChart(checkpoints, labels, todoSeries, inprogSeries, testingSeries, doneSeries) {
     const NS = "http://www.w3.org/2000/svg";

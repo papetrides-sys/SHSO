@@ -275,8 +275,6 @@
     .update-result-table td.update-td-date  { white-space: nowrap; }
     .update-result-table td.update-td-sev   { white-space: nowrap; }
     .update-result-table td.update-td-fix   { white-space: nowrap; }
-    /* Reopen table sits inside a dash-full panel — inherit full width */
-    .reopen-table { margin-top: 0; }
 
     /* ── Statistics ────────────────────────────────────────────────────────── */
     #statsDropZone {
@@ -1087,6 +1085,7 @@
     }
     .bc-kpi-section.bc-collapsed .bc-collapse-btn { transform: rotate(-90deg); }
     .bc-kpi-section.bc-collapsed .bc-section-body { display: none; }
+
   </style>
 </head>
 <body>
@@ -1407,15 +1406,12 @@
 
         </div>
 
-        <!-- Reopen Items panel -->
-        <div class="dash-full" id="reopenSection" hidden>
-          <p class="dash-panel-title" style="color:#b91c1c">Reopen Items</p>
-          <p id="reopenCount" style="font-size:0.82rem;font-weight:600;color:#1f2328;margin-bottom:0.75rem"></p>
-          <table id="reopenTable" class="update-result-table reopen-table"></table>
-        </div>
-
         <!-- Full-width burnout panel -->
         <div class="dash-full" id="dashFull" hidden>
+
+          <!-- Created vs Resolved per Week — populated by runAging() -->
+          <div id="createdVsResolvedSection" class="creation-section" hidden></div>
+
           <div id="agingSection" class="aging-section" hidden>
             <p class="dash-panel-title">Burnout</p>
             <p class="aging-hint">
