@@ -1454,8 +1454,18 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       return count;
     });
+    const testingOnlySeries = checkpoints.map(cp => {
+      let count = 0;
+      for (const row of cvrRows) {
+        const st = row[2] != null ? String(row[2]).trim().toUpperCase() : "";
+        if (st !== "TESTING") continue;
+        const d = parseDate(row[3]);
+        if (d && d >= fromDate && d <= cp) count++;
+      }
+      return count;
+    });
     createdVsResolvedSection.appendChild(
-      buildCreatedVsResolvedChart(checkpoints, labels, createdSeries, resolvedSeries)
+      buildCreatedVsResolvedChart(checkpoints, labels, createdSeries, resolvedSeries, testingOnlySeries)
     );
     createdVsResolvedSection.hidden = false;
 
@@ -1497,11 +1507,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
   /**
-   * Build a two-line chart showing tickets Created per Week vs Resolved per Week.
-   * Created  = reported/created date (col 11, index 10) falls within the week.
-   * Resolved = status date (col 4, index 3) falls within the week AND status is DONE/CLOSED.
+   * Build a three-line chart: Created / In Testing / Resolved per Week (cumulative).
+   * Created  = reported/created date (col 11, index 10).
+   * Testing  = status date (col 4, index 3) and status TESTING.
+   * Resolved = status date (col 4, index 3) and status DONE/CLOSED.
    */
-  function buildCreatedVsResolvedChart(checkpoints, labels, createdSeries, resolvedSeries) {
+  function buildCreatedVsResolvedChart(checkpoints, labels, createdSeries, resolvedSeries, testingSeries) {
     const NS = "http://www.w3.org/2000/svg";
     const W = 620, H = 240;
     const PAD = { top: 16, right: 20, bottom: 52, left: 44 };
@@ -1510,9 +1521,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const n = checkpoints.length;
 
     const CREATED_COLOR  = "#3b82d4"; // blue
+    const TESTING_COLOR  = "#7c5cd8"; // purple
     const RESOLVED_COLOR = "#22c55e"; // green
 
-    const allVals = [...createdSeries, ...resolvedSeries];
+    const allVals = [...createdSeries, ...resolvedSeries, ...(testingSeries ?? [])];
     const maxVal  = Math.max(...allVals, 1);
 
     const xOf = i => PAD.left + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
@@ -1585,8 +1597,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    drawSeries(createdSeries,  CREATED_COLOR,  "aging-dot-todo");
-    drawSeries(resolvedSeries, RESOLVED_COLOR, "aging-dot-done");
+    drawSeries(resolvedSeries,  RESOLVED_COLOR, "aging-dot-done");
+    if (testingSeries) drawSeries(testingSeries, TESTING_COLOR, "aging-dot-testing");
+    drawSeries(createdSeries,   CREATED_COLOR,  "aging-dot-todo");
 
     // Transparent overlay for hover
     const overlay = document.createElementNS(NS, "rect");
@@ -1629,6 +1642,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tooltip.innerHTML =
         `<strong>${labels[idx]}</strong><br>` +
         `<span style="color:${CREATED_COLOR}">■</span> Created: ${createdSeries[idx]}<br>` +
+        (testingSeries ? `<span style="color:${TESTING_COLOR}">■</span> In Testing: ${testingSeries[idx]}<br>` : "") +
         `<span style="color:${RESOLVED_COLOR}">■</span> Resolved: ${resolvedSeries[idx]}`;
 
       const svgLeft = rect.left - wrap.getBoundingClientRect().left;
@@ -1653,14 +1667,19 @@ document.addEventListener("DOMContentLoaded", () => {
          <span class="aging-legend-swatch" style="background:${CREATED_COLOR}"></span> Created this week
        </div>
        <div class="aging-legend-item">
+         <span class="aging-legend-swatch" style="background:${TESTING_COLOR}"></span> In Testing this week
+       </div>
+       <div class="aging-legend-item">
          <span class="aging-legend-swatch" style="background:${RESOLVED_COLOR}"></span> Resolved this week
        </div>`;
     wrap.appendChild(legend);
 
     // Stat bar — series are cumulative so the last value is the total
     const totalCreated  = n > 0 ? createdSeries[n - 1]  : 0;
+    const totalTesting  = n > 0 && testingSeries ? testingSeries[n - 1] : 0;
     const totalResolved = n > 0 ? resolvedSeries[n - 1] : 0;
     const avgCreated    = n > 0 ? (totalCreated  / n).toFixed(1) : "—";
+    const avgTesting    = n > 0 && testingSeries ? (totalTesting  / n).toFixed(1) : "—";
     const avgResolved   = n > 0 ? (totalResolved / n).toFixed(1) : "—";
     const statBar = document.createElement("div");
     statBar.className = "creation-stat-bar";
@@ -1672,6 +1691,14 @@ document.addEventListener("DOMContentLoaded", () => {
        <div class="creation-stat-item">
          <span class="creation-stat-value" style="color:${CREATED_COLOR}">${avgCreated}/wk</span>
          <span class="creation-stat-label">Avg Created</span>
+       </div>
+       <div class="creation-stat-item">
+         <span class="creation-stat-value" style="color:${TESTING_COLOR}">${totalTesting}</span>
+         <span class="creation-stat-label">Total In Testing</span>
+       </div>
+       <div class="creation-stat-item">
+         <span class="creation-stat-value" style="color:${TESTING_COLOR}">${avgTesting}/wk</span>
+         <span class="creation-stat-label">Avg In Testing</span>
        </div>
        <div class="creation-stat-item">
          <span class="creation-stat-value" style="color:${RESOLVED_COLOR}">${totalResolved}</span>
